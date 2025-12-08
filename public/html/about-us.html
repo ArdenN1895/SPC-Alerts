@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="SPC Alerts">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/img/icon-192.png">
+    <link rel="apple-touch-icon" href="/img/icon-192.png">
+    
+    <title>About SPC Alerts</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="../css/about-us.css">
+    
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', async () => {
+          try {
+            // Try absolute path first
+            let registration = await navigator.serviceWorker.register('/service-worker.js', { scope: '/' });
+            console.log('✅ Service Worker registered:', registration.scope);
+          } catch (err) {
+            console.warn('❌ Absolute SW registration failed, trying fallback...');
+            try {
+              // Fallback: try relative path
+              await navigator.serviceWorker.register('../../../service-worker.js', { scope: '/' });
+              console.log('✅ Service Worker registered (fallback)');
+            } catch (fallbackErr) {
+              console.error('❌ Fallback also failed:', fallbackErr);
+            }
+          }
+        });
+      }
+    </script>
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <div class="logo">
+                <a href="index.html">SPC Alerts</a>
+            </div>
+            <div class="header-actions">
+                <button id="installBtn" class="install-btn" style="display:none;"><i class="fas fa-download"></i></button>
+                <a href="#" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <nav>   
+        <div class="nav-container">
+            <ul class="main-nav" id="mainNav">
+                <li><a href="map.html">Map</a></li>
+                <li><a href="live-broadcast.html">Live Broadcast</a></li>
+                <li><a href="news-outlet.html">News Outlet</a></li>
+                <li><a href="donation.html">Donation</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="about-us.html" class="active">About Us</a></li>
+            </ul>
+            <button class="burger" id="burgerBtn">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>About SPC Alerts</h1>
+            <p>Meet the team behind the safety platform</p>
+        </div>
+
+        <h2 class="section-title">Our Team</h2>
+        
+        <div class="team-pyramid-wrapper">
+            <div class="team-row-1">
+                <div class="team-card">
+                    <div class="team-photo">
+                        <img src="../img/kith.png" alt="" class="team-img">
+                    </div>
+                    <h3 class="team-name">Vench Kith Redoncillo</h3>
+                    <p class="team-role">Assisstant Programmer</p>
+                    <a href="mailto:john.doe@spcalerts.com" class="team-email">
+                        <i class="fas fa-envelope"></i>
+                        Venchkithredoncillo88@gmail.com
+                    </a>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-photo">
+                        <img src="../img/roden.png" alt="" class="team-img">
+                    </div>
+                    <h3 class="team-name">John Roden Guinto</h3>
+                    <p class="team-role">Project Manager & Developer</p>
+                    <a href="mailto:jane.smith@spcalerts.com" class="team-email">
+                        <i class="fas fa-envelope"></i>
+                        johnrodengold@gmail.com
+                    </a>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-photo">
+                        <img src="../img/kyle.png" alt="" class="team-img">
+                    </div>
+                    <h3 class="team-name">Kyle Michael Mendoza</h3>
+                    <p class="team-role">System Analyst</p>
+                    <a href="mailto:mike.johnson@spcalerts.com" class="team-email">
+                        <i class="fas fa-envelope"></i>
+                        kylem2920@gmail.com
+                    </a>
+                </div>
+            </div>
+
+            <div class="team-row-2">
+                <div class="team-card">
+                    <div class="team-photo">
+                        <img src="../img/seb.png" alt="" class="team-img">
+                    </div>
+                    <h3 class="team-name">Edward Rafael Brinosa</h3>
+                    <p class="team-role">Technical Writer</p>
+                    <a href="mailto:sarah.williams@spcalerts.com" class="team-email">
+                        <i class="fas fa-envelope"></i>
+                        sfmaster901@gmail.com
+                    </a>
+                </div>
+
+                <div class="team-card">
+                    <div class="team-photo">
+                        <img src="../img/nhoe.png" alt="" class="team-img">
+                    </div>
+                    <h3 class="team-name">Nhoe Albano</h3>
+                    <p class="team-role">Tester</p>
+                    <a href="mailto:david.brown@spcalerts.com" class="team-email">
+                        <i class="fas fa-envelope"></i>
+                        cabintanoe@gmail.com
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Mission & Vision</h2>
+        <div class="mission-vision">
+            <div class="mv-card">
+                <h3 class="mv-title">Our Mission</h3>
+                <p class="mv-text">
+                    To provide timely, accurate, and accessible emergency alerts and safety information to communities across the Philippines. We strive to empower citizens with real-time updates and critical resources that can save lives during natural disasters and emergencies.
+                </p>
+            </div>
+
+            <div class="mv-card">
+                <h3 class="mv-title">Our Vision</h3>
+                <p class="mv-text">
+                    To become the most trusted and comprehensive emergency alert system in the Philippines, creating safer communities through technology, innovation, and collaboration. We envision a future where every Filipino has instant access to life-saving information.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-emergency">
+            <h3>EMERGENCY PHONE NUMBERS</h3>
+            <div class="emergency-list">
+                <div class="emergency-item">
+                    <span class="emergency-label">National Emergency Hotline</span>
+                    <span class="emergency-number">911</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Red Cross (PRC)</span>
+                    <span class="emergency-number">143 or (02) 8790-2300</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">NDRRMC</span>
+                    <span class="emergency-number">(02) 8911-5061 to 65</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine National Police (PNP)</span>
+                    <span class="emergency-number">117 or (02) 8722-0650</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Bureau of Fire Protection (BFP)</span>
+                    <span class="emergency-number">(02) 8426-0219 or (02) 8426-0246</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Coast Guard (PCG)</span>
+                    <span class="emergency-number">(02) 8527-3877</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">DSWD</span>
+                    <span class="emergency-number">(02) 8931-8101</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">PAGASA (Weather Updates)</span>
+                    <span class="emergency-number">(02) 8284-0800</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="copyright">
+            <p>© 2025 SPC Alerts • To God Be The Glory</p>
+        </div>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    <script type="module" src="../javascript/supabase.js" defer></script>
+    <script type="module" src="../javascript/sos.js" defer></script>
+    <script src="../javascript/pwa.js" defer></script>
+    <script type="module" src="../javascript/keep-alive.js" defer></script>
+    
+    <script>
+        const burgerBtn = document.getElementById("burgerBtn");
+        const mainNav = document.getElementById("mainNav");
+
+        burgerBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            mainNav.classList.toggle("show");
+            burgerBtn.classList.toggle("active");
+        });
+
+        document.addEventListener("click", (e) => {
+            if (!mainNav.contains(e.target) && !burgerBtn.contains(e.target)) {
+                mainNav.classList.remove("show");
+                burgerBtn.classList.remove("active");
+            }
+        });
+    </script>
+
+    <script>
+        document.querySelectorAll('.logout').forEach(el => {
+            el.addEventListener('click', e => {
+                e.preventDefault();
+                if (confirm('Logout from SPC Alerts?')) {
+                    localStorage.clear();
+                    window.location.href = '../html/login.html';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

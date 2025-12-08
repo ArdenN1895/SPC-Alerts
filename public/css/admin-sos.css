@@ -1,0 +1,534 @@
+/* admin-sos.css - Complete Styles for Admin SOS Management Page */
+
+/* Statistics Grid */
+.sos-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.sos-stat-card {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-left: 5px solid transparent;
+}
+
+.sos-stat-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+
+.sos-stat-card.waiting {
+    border-left-color: #f59e0b;
+}
+
+.sos-stat-card.dispatched {
+    border-left-color: #3b82f6;
+}
+
+.sos-stat-card.arrived {
+    border-left-color: #10b981;
+}
+
+.sos-stat-card.total {
+    border-left-color: #8b5cf6;
+}
+
+/* Stat Icon */
+.sos-stat-card .stat-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: white;
+    flex-shrink: 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.sos-stat-card.waiting .stat-icon {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.sos-stat-card.dispatched .stat-icon {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.sos-stat-card.arrived .stat-icon {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.sos-stat-card.total .stat-icon {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+/* Stat Info */
+.sos-stat-card .stat-info {
+    flex: 1;
+}
+
+.sos-stat-card .stat-info h3 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin: 0 0 5px 0;
+    color: var(--dark);
+    line-height: 1;
+}
+
+.sos-stat-card .stat-info p {
+    color: var(--gray);
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* SOS List Table Container */
+.sos-list {
+    background: white;
+    padding: 28px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    overflow-x: auto;
+}
+
+.sos-list h2 {
+    color: var(--admin);
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+}
+
+/* Table Styles */
+.sos-list table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+    font-size: 0.95rem;
+}
+
+.sos-list thead {
+    background: var(--light);
+}
+
+.sos-list th {
+    background: var(--light);
+    color: var(--dark);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.8px;
+    padding: 16px 12px;
+    text-align: left;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+}
+
+.sos-list td {
+    padding: 18px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.sos-list tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.sos-list tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* New SOS Alert Row */
+.sos-alert-new {
+    animation: pulse-border 2s infinite;
+    background: #fef2f2 !important;
+    position: relative;
+}
+
+.sos-alert-new::before {
+    content: 'NEW';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #dc2626;
+    color: white;
+    padding: 4px 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    border-radius: 0 4px 4px 0;
+    letter-spacing: 0.5px;
+}
+
+@keyframes pulse-border {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    }
+}
+
+/* Status Badge */
+.status-badge {
+    display: inline-block;
+    padding: 7px 18px;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+.status-badge.waiting {
+    background: #fef3c7;
+    color: #92400e;
+    border: 2px solid #fde68a;
+}
+
+.status-badge.dispatched {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 2px solid #bfdbfe;
+}
+
+.status-badge.arrived {
+    background: #d1fae5;
+    color: #065f46;
+    border: 2px solid #a7f3d0;
+}
+
+/* Time Display */
+.sos-time {
+    font-weight: 600;
+    color: var(--dark);
+    font-size: 0.95rem;
+}
+
+.sos-time-ago {
+    font-size: 0.75rem;
+    color: var(--gray);
+    display: block;
+    margin-top: 3px;
+    font-weight: 400;
+}
+
+/* Sender Info */
+.sos-sender {
+    font-weight: 600;
+    color: var(--dark);
+    font-size: 0.95rem;
+}
+
+/* Contact Info */
+.sos-contact {
+    color: var(--gray);
+    font-size: 0.9rem;
+}
+
+/* Location Display */
+.sos-location {
+    max-width: 320px;
+    color: var(--gray);
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.sos-location a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+.sos-location a:hover {
+    text-decoration: underline;
+    color: var(--secondary);
+}
+
+/* Action Buttons */
+.action-buttons-sos {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-update-status {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 94, 165, 0.2);
+}
+
+.btn-update-status:hover {
+    background: var(--secondary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 94, 165, 0.35);
+}
+
+.btn-view-location {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
+
+.btn-view-location:hover {
+    background: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+}
+
+/* Refresh Button */
+#refreshBtn {
+    background: var(--accent);
+}
+
+#refreshBtn:hover {
+    background: #d35400;
+}
+
+/* Modal Overrides for Status Update */
+#statusModal .modal-body {
+    padding: 30px;
+}
+
+#statusModal .form-group label {
+    font-size: 15px;
+    margin-bottom: 10px;
+}
+
+#statusModal #currentStatus {
+    background: #f0f9ff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary);
+}
+
+#statusModal select {
+    font-size: 15px;
+    padding: 14px;
+}
+
+/* Responsive Design - Tablet */
+@media (max-width: 992px) {
+    .sos-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+    }
+
+    .sos-list {
+        padding: 24px;
+    }
+
+    .sos-list table {
+        min-width: 800px;
+    }
+}
+
+/* Responsive Design - Mobile */
+@media (max-width: 768px) {
+    .sos-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .sos-stat-card {
+        padding: 18px;
+        flex-direction: column;
+        text-align: center;
+        gap: 12px;
+    }
+
+    .sos-stat-card .stat-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 28px;
+    }
+
+    .sos-stat-card .stat-info h3 {
+        font-size: 1.8rem;
+    }
+
+    .sos-stat-card .stat-info p {
+        font-size: 0.85rem;
+    }
+
+    .sos-list {
+        padding: 20px;
+    }
+
+    .sos-list table {
+        font-size: 0.9rem;
+        min-width: 750px;
+    }
+
+    .sos-list th, 
+    .sos-list td {
+        padding: 12px 10px;
+    }
+
+    .action-buttons-sos {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .btn-update-status,
+    .btn-view-location {
+        width: 100%;
+        justify-content: center;
+        padding: 10px 16px;
+    }
+
+    .sos-location {
+        max-width: 250px;
+        font-size: 0.85rem;
+    }
+}
+
+/* Responsive Design - Small Mobile */
+@media (max-width: 480px) {
+    .sos-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .sos-stat-card {
+        padding: 16px;
+    }
+
+    .sos-stat-card .stat-icon {
+        width: 55px;
+        height: 55px;
+        font-size: 26px;
+    }
+
+    .sos-stat-card .stat-info h3 {
+        font-size: 1.6rem;
+    }
+
+    .sos-stat-card .stat-info p {
+        font-size: 0.8rem;
+    }
+
+    .sos-list {
+        padding: 16px;
+    }
+
+    .sos-list table {
+        font-size: 0.85rem;
+        min-width: 700px;
+    }
+
+    .sos-list th,
+    .sos-list td {
+        padding: 10px 8px;
+    }
+
+    .status-badge {
+        padding: 6px 14px;
+        font-size: 0.8rem;
+    }
+
+    .sos-time {
+        font-size: 0.85rem;
+    }
+
+    .sos-time-ago {
+        font-size: 0.7rem;
+    }
+}
+
+/* Loading State */
+.sos-list tbody td[colspan] {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+    font-size: 1rem;
+}
+
+/* Empty State */
+.sos-list tbody tr td:only-child {
+    text-align: center;
+    padding: 80px 20px;
+    color: #999;
+    font-style: italic;
+}
+
+/* Scrollbar Styling for Table */
+.sos-list::-webkit-scrollbar {
+    height: 10px;
+}
+
+.sos-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 5px;
+}
+
+.sos-list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 5px;
+}
+
+.sos-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Print Styles */
+@media print {
+    .admin-header,
+    .admin-actions,
+    .action-buttons-sos,
+    footer {
+        display: none !important;
+    }
+
+    .sos-list {
+        box-shadow: none;
+        padding: 0;
+    }
+
+    .sos-alert-new {
+        animation: none;
+        background: white !important;
+    }
+
+    .sos-alert-new::before {
+        display: none;
+    }
+}

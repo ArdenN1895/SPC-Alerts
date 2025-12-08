@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evacuation Centers Map • SPC Alerts</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet CSS - MUST load before JavaScript -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="../css/maps.css">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/img/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="SPC Alerts">
+    <link rel="apple-touch-icon" href="/img/icon-192.png">
+
+    <!-- PWA Install Button (shared) -->
+    <script src="../javascript/pwa.js" defer></script>
+
+    <!-- Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(() => console.log('SW registered'))
+            .catch(err => console.log('SW failed:', err));
+        });
+      }
+</script>
+
+</head>
+<body>
+
+    <header>
+        <div class="header-top">
+            <div class="logo">
+                <a href="index.html">SPC Alerts</a>
+            </div>
+            <div class="header-actions">
+                <button id="installBtn" class="install-btn" style="display:none;" title="Install App">
+                    <i class="fas fa-download"></i>
+                </button>
+                <a href="#" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <nav>   
+        <div class="nav-container">
+            <ul class="main-nav" id="mainNav">
+                <li><a href="map.html" class="active">Map</a></li>
+                <li><a href="live-broadcast.html">Live Broadcast</a></li>
+                <li><a href="news-outlet.html">News Outlet</a></li>
+                <li><a href="donation.html">Donation</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="about-us.html">About Us</a></li>
+            </ul>
+
+            <button class="burger" id="burgerBtn">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="map-main">
+        <div class="map-header">
+            <h1>Evacuation Centers & Risk Map</h1>
+            <p style="font-weight: 700">Tap Any Blue Pins For More Information</p>
+        </div>
+
+        <!-- Interactive Leaflet Map -->
+        <div id="map" class="map-container"></div>
+    </main>
+
+    <footer>
+        <div class="footer-emergency">
+            <h3>EMERGENCY PHONE NUMBERS</h3>
+            <div class="emergency-list">
+                <div class="emergency-item">
+                    <span class="emergency-label">National Emergency Hotline</span>
+                    <span class="emergency-number">911</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Red Cross (PRC)</span>
+                    <span class="emergency-number">143 or (02) 8790-2300</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">NDRRMC</span>
+                    <span class="emergency-number">(02) 8911-5061 to 65</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine National Police (PNP)</span>
+                    <span class="emergency-number">117 or (02) 8722-0650</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Bureau of Fire Protection (BFP)</span>
+                    <span class="emergency-number">(02) 8426-0219 or (02) 8426-0246</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Coast Guard (PCG)</span>
+                    <span class="emergency-number">(02) 8527-3877</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">DSWD</span>
+                    <span class="emergency-number">(02) 8931-8101</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">PAGASA (Weather Updates)</span>
+                    <span class="emergency-number">(02) 8284-0800</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="copyright">
+            <p>© 2025 SPC Alerts • To God Be The Glory</p>
+        </div>
+    </footer>
+
+    <!-- Leaflet JS - MUST load before your script -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Your Map Script -->
+    <script src="../javascript/maps.js"></script>
+
+    <!-- PWA Install + Mobile Menu + Logout -->
+    <script>
+        // PWA Install Prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installBtn').style.display = 'flex';
+        });
+
+        document.getElementById('installBtn').addEventListener('click', () => {
+            document.getElementById('installBtn').style.display = 'none';
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+        });
+
+        // Logout
+        document.querySelectorAll('.logout').forEach(el => {
+            el.addEventListener('click', e => {
+                e.preventDefault();
+                if (confirm('Are you sure you want to logout?')) {
+                    localStorage.clear();
+                    window.location.href = 'login.html';
+                }
+            });
+        });
+    </script>
+
+    <!-- Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try {
+                    let registration = await navigator.serviceWorker.register('/service-worker.js', {
+                        scope: '/'
+                    });
+                    console.log('✅ Service Worker registered:', registration.scope);
+                    await navigator.serviceWorker.ready;
+                    console.log('✅ Service Worker ready');
+                } catch (err) {
+                    console.error('❌ Service Worker registration failed:', err);
+                }
+            });
+        }
+    </script>
+    <script src="../javascript/keep-alive.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "webpush": "https://jsr.io/@dqbd/web-push/3.0.2/mod.ts",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+  }
+}

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="SPC Alerts">
+    <title>SPC Alerts</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    
+    <!-- FREE Reverse Geocoding (Photon + Leaflet) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/img/icon-192.png">
+    <link rel="apple-touch-icon" href="/img/icon-192.png">
+
+    <!-- SOS Button -->
+    <script type="module" src="../javascript/sos.js"></script>
+    <script src="../javascript/pwa.js" defer></script>
+
+    <!-- Supabase -->
+    <script type="module">
+      import '../javascript/supabase.js';
+    </script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      // Try absolute path first
+      let registration = await navigator.serviceWorker.register('/service-worker.js', {
+        scope: '/'
+      });
+      console.log('✅ Service Worker registered:', registration.scope);
+      
+      // Wait for it to be ready
+      await navigator.serviceWorker.ready;
+      console.log('✅ Service Worker ready');
+      
+    } catch (err) {
+      console.error('❌ Service Worker registration failed:', err);
+      
+      // Fallback: try relative path
+      try {
+        const registration = await navigator.serviceWorker.register('../../../service-worker.js', {
+          scope: '/'
+        });
+        console.log('✅ Service Worker registered (fallback):', registration.scope);
+      } catch (fallbackErr) {
+        console.error('❌ Fallback also failed:', fallbackErr);
+      }
+    }
+  });
+}
+</script>
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <div class="logo">
+                <a href="index.html">SPC Alerts</a>
+            </div>
+            <div class="header-actions">
+                <button id="installBtn" class="install-btn" style="display:none;"><i class="fas fa-download"></i></button>
+                <a href="#" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <nav>   
+    <div class="nav-container">
+        <ul class="main-nav" id="mainNav">
+            <li><a href="map.html">Map</a></li>
+            <li><a href="live-broadcast.html">Live Broadcast</a></li>
+            <li><a href="news-outlet.html">News Outlet</a></li>
+            <li><a href="donation.html">Donation</a></li>
+            <li><a href="profile.html">Profile</a></li>
+            <li><a href="about-us.html">About Us</a></li>
+        </ul>
+        <button class="burger" id="burgerBtn">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero-content">
+            <h2>San Pablo City Alert</h2>
+            <p>SPC Alerts engagement is directed towards strengthening coordinated disaster preparedness and empowering communities to act early and stay safe</p>
+            <div class="hero-buttons">
+                <button id="sosButton" class="btn btn-primary sos-btn">
+                    SOS - EMERGENCY
+                </button>
+                <a href="incident-report.html" class="btn btn-outline">Report Incident</a>
+            </div>
+            <p id="sosStatus" style="margin-top: 15px; font-weight: bold; color: #d32f2f; display: none;"></p>
+        </div>
+    </section>
+
+    <section class="container">
+        <h2 class="section-title">Reported Incidents</h2>
+        <div class="cards">
+            <!-- Incidents with real addresses will load here -->
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-emergency">
+            <h3>EMERGENCY PHONE NUMBERS</h3>
+            <div class="emergency-list">
+                <div class="emergency-item">
+                    <span class="emergency-label">National Emergency Hotline</span>
+                    <span class="emergency-number">911</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Red Cross (PRC)</span>
+                    <span class="emergency-number">143 or (02) 8790-2300</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">NDRRMC</span>
+                    <span class="emergency-number">(02) 8911-5061 to 65</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine National Police (PNP)</span>
+                    <span class="emergency-number">117 or (02) 8722-0650</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Bureau of Fire Protection (BFP)</span>
+                    <span class="emergency-number">(02) 8426-0219 or (02) 8426-0246</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Coast Guard (PCG)</span>
+                    <span class="emergency-number">(02) 8527-3877</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">DSWD</span>
+                    <span class="emergency-number">(02) 8931-8101</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">PAGASA (Weather Updates)</span>
+                    <span class="emergency-number">(02) 8284-0800</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="copyright">
+            <p>© 2025 SPC Alerts • To God Be The Glory</p>
+        </div>
+    </footer>
+
+    <script type="module" src="../javascript/index.js"></script>
+
+    <script>
+        document.querySelectorAll('.logout').forEach(el => {
+            el.addEventListener('click', e => {
+                e.preventDefault();
+                if (confirm('Logout from SPC Alerts?')) {
+                    localStorage.clear();
+                    window.location.href = '../html/login.html';
+                }
+            });
+        });
+    </script>
+<script type="module">
+  import { initPushNotifications } from '../javascript/push.js';
+  window.addEventListener('supabase-ready', () => {
+    setTimeout(initPushNotifications, 3000); // after login
+  });
+</script>
+    <script src="../javascript/keep-alive.js" type="module"></script>
+</body>
+</html>

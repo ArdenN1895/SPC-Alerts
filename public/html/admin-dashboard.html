@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - SPC Alerts</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css?v=11">
+  <link rel="stylesheet" href="../css/alert-modal.css">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/img/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/icon-192.png">
+
+  <script src="../javascript/pwa.js" defer></script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      // Try absolute path first
+      let registration = await navigator.serviceWorker.register('/service-worker.js', {
+        scope: '/'
+      });
+      console.log('✅ Service Worker registered:', registration.scope);
+      
+      // Wait for it to be ready
+      await navigator.serviceWorker.ready;
+      console.log('✅ Service Worker ready');
+      
+    } catch (err) {
+      console.error('❌ Service Worker registration failed:', err);
+      
+      // Fallback: try relative path
+      try {
+        const registration = await navigator.serviceWorker.register('../../../service-worker.js', {
+          scope: '/'
+        });
+        console.log('✅ Service Worker registered (fallback):', registration.scope);
+      } catch (fallbackErr) {
+        console.error('❌ Fallback also failed:', fallbackErr);
+      }
+    }
+  });
+}
+</script>
+</head>
+<body>
+  <!-- Admin Header -->
+  <header class="admin-header">
+    <div class="admin-container">
+      <div class="dashboard-header">
+  <h1><i class="fas fa-shield-alt"></i> SPC Alerts</h1>
+
+      <div class="header-right">
+        <div class="admin-badge">
+          <i class="fas fa-user-shield"></i> Administrator
+        </div>
+    
+       <div class="admin-nav-tabs">
+            <a href="admin-dashboard.html" class="nav-tab active">
+              <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="admin-users.html" class="nav-tab">
+              <i class="fas fa-users"></i> Users
+            </a>
+            <a href="admin-incident.html" class="nav-tab">
+              <i class="fas fa-exclamation-triangle"></i> Incidents
+            </a>
+            <a href="admin-sos.html" class="nav-tab">
+              <i class="fas fa-ambulance"></i> SOS
+            </a>
+        </div>
+
+    <div class="header-actions">
+      <button id="installBtn" class="install-btn" style="display:none;">
+        <i class="fas fa-download"></i>
+      </button>
+      <button class="logout-btn" onclick="logout()">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </button>
+    </div>
+  </div>
+</div>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>0</h3><p>Total Users</p><small>Real-time count</small>
+        </div>
+        <div class="stat-card">
+          <h3>0</h3><p>Active Alerts</p><small>Incidents reported</small>
+        </div>
+        <div class="stat-card">
+          <h3>99.9%</h3><p>System Uptime</p><small>All systems operational</small>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="admin-actions">
+        <h2>Quick Actions</h2>
+        <div class="action-buttons">
+          <button class="action-btn">Send Alert</button>
+          <button class="action-btn">Generate Report</button>
+          <button class="action-btn admin">System Settings</button>
+        </div>
+      </div>
+
+      <!-- Alert Modal -->
+<div id="alertModal" class="alert-modal">
+  <div class="alert-modal-content">
+    <div class="alert-modal-header">
+      <h2><i class="fas fa-bell"></i> Send Emergency Alert</h2>
+      <button class="alert-modal-close" id="closeAlertModal">&times;</button>
+    </div>
+    
+    <form id="alertForm">
+      <div class="alert-form-group">
+        <label for="alertTitle">Alert Title <span class="required">*</span></label>
+        <input 
+          type="text" 
+          id="alertTitle" 
+          placeholder="e.g., Emergency Alert, Fire Warning, etc." 
+          value="Emergency Alert"
+          required
+          maxlength="50"
+        >
+        <small class="form-hint">Maximum 50 characters</small>
+      </div>
+
+      <div class="alert-form-group">
+        <label for="alertMessage">Alert Message <span class="required">*</span></label>
+        <textarea 
+          id="alertMessage" 
+          rows="5" 
+          placeholder="Enter your emergency message here..."
+          required
+          maxlength="200"
+        >Please stay safe and follow official instructions.</textarea>
+        <small id="charCount" class="form-hint">200 characters remaining</small>
+      </div>
+
+      <div class="alert-form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="urgentAlert">
+          <span>Mark as urgent (will show priority notification)</span>
+        </label>
+      </div>
+
+      <div class="alert-preview">
+        <strong class="preview-label">Preview:</strong>
+        <div class="preview-card">
+          <strong id="previewTitle" class="preview-title">Emergency Alert</strong>
+          <p id="previewMessage" class="preview-message">Please stay safe and follow official instructions.</p>
+        </div>
+      </div>
+
+      <div class="alert-modal-actions">
+        <button type="button" class="alert-btn alert-btn-cancel" id="cancelAlertBtn">
+          Cancel
+        </button>
+        <button type="submit" class="alert-btn alert-btn-primary" id="sendAlertBtn">
+          <i class="fas fa-paper-plane"></i> Send Alert
+        </button>
+      </div>
+    </form>
+
+    <div id="alertStatus" class="alert-status" style="display:none;"></div>
+  </div>
+</div>
+    </div>
+  </main>
+
+  <footer>
+        <div class="footer-emergency">
+            <h3>EMERGENCY PHONE NUMBERS</h3>
+            <div class="emergency-list">
+                <div class="emergency-item">
+                    <span class="emergency-label">National Emergency Hotline</span>
+                    <span class="emergency-number">911</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Red Cross (PRC)</span>
+                    <span class="emergency-number">143 or (02) 8790-2300</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">NDRRMC</span>
+                    <span class="emergency-number">(02) 8911-5061 to 65</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine National Police (PNP)</span>
+                    <span class="emergency-number">117 or (02) 8722-0650</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Bureau of Fire Protection (BFP)</span>
+                    <span class="emergency-number">(02) 8426-0219 or (02) 8426-0246</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Coast Guard (PCG)</span>
+                    <span class="emergency-number">(02) 8527-3877</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">DSWD</span>
+                    <span class="emergency-number">(02) 8931-8101</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">PAGASA (Weather Updates)</span>
+                    <span class="emergency-number">(02) 8284-0800</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="copyright">
+            <p>© 2025 SPC Alerts • To God Be The Glory</p>
+        </div>
+    </footer>
+
+  <!-- Supabase Client -->
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+    const supabaseUrl = 'https://oqmfjwlpuwfpbnpiavhp.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTgxNzYsImV4cCI6MjA3OTQ3NDE3Nn0.yywiH3q3g1Rbyypt5mxvhRgDXZrSFENZn5s1EWVp8Z8';
+    window.supabase = createClient(supabaseUrl, supabaseAnonKey);
+    window.supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' && !location.pathname.includes('login.html')) {
+        location.href = '/public/html/login.html';
+      }
+    });
+    window.dispatchEvent(new Event('supabase-ready'));
+  </script>
+
+  <script src="../javascript/admin.js" defer></script>
+  <script src="../javascript/keep-alive.js" type="module"></script>
+</body>
+</html>

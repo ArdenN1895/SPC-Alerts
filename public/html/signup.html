@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPC Alerts - Create Account</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/signup.css">
+    <script src="../javascript/supabase.js" defer></script>
+    <script src="../javascript/signup.js" defer></script>
+
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/img/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="SPC Alerts">
+    <link rel="apple-touch-icon" href="/img/icon-192.png">
+
+    <!-- PWA Install Button (shared) -->
+    <script src="../javascript/pwa.js" defer></script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      // Try absolute path first
+      let registration = await navigator.serviceWorker.register('/service-worker.js', {
+        scope: '/'
+      });
+      console.log('✅ Service Worker registered:', registration.scope);
+      
+      // Wait for it to be ready
+      await navigator.serviceWorker.ready;
+      console.log('✅ Service Worker ready');
+      
+    } catch (err) {
+      console.error('❌ Service Worker registration failed:', err);
+      
+      // Fallback: try relative path
+      try {
+        const registration = await navigator.serviceWorker.register('../../../service-worker.js', {
+          scope: '/'
+        });
+        console.log('✅ Service Worker registered (fallback):', registration.scope);
+      } catch (fallbackErr) {
+        console.error('❌ Fallback also failed:', fallbackErr);
+      }
+    }
+  });
+}
+</script>
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <div class="logo"><a href="#">SPC Alerts</a></div>
+            <div class="header-actions">
+                <button id="installBtn" class="install-btn" style="display:none;">Install App</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="signup-container">
+        <div class="signup-card">
+            <div class="signup-header">
+                <h2>Create Your Account</h2>
+                <p>Join SPC Alerts for real-time disaster updates</p>
+            </div>
+
+            <form class="signup-form" id="signupForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="firstName">First Name *</label>
+                        <input type="text" id="firstName" required placeholder="Juan">
+                    </div>
+                    <div class="form-group">
+                        <label for="lastName">Last Name *</label>
+                        <input type="text" id="lastName" required placeholder="Dela Cruz">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="username">Username * </label>
+                    <input type="text" id="username" required placeholder="JuanonJuan" pattern="[a-zA-Z0-9_]{3,30}">
+                    <small>Letters, numbers, underscore only</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email Address *</label>
+                    <input type="email" id="email" required placeholder="juan@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone Number *</label>
+                    <input type="tel" id="phone" required placeholder="+639171234567">
+                </div>
+
+                <div class="form-group">
+                    <label for="address">Address *</label>
+                    <input type="text" id="address" required placeholder="123 Main St, San Pablo City, Laguna">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password">Password *</label>
+                        <input type="password" id="password" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm PW *</label>
+                        <input type="password" id="confirmPassword" required minlength="6">
+                    </div>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="terms" required>
+                    <label for="terms">I agree to the <a href="#">Terms</a> & <a href="#">Privacy Policy</a></label>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+
+                <div class="login-link">
+                    <p>Already have an account? <a href="login.html">Log In</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-emergency">
+            <h3>EMERGENCY PHONE NUMBERS</h3>
+            <div class="emergency-list">
+                <div class="emergency-item">
+                    <span class="emergency-label">National Emergency Hotline</span>
+                    <span class="emergency-number">911</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Red Cross (PRC)</span>
+                    <span class="emergency-number">143 or (02) 8790-2300</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">NDRRMC</span>
+                    <span class="emergency-number">(02) 8911-5061 to 65</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine National Police (PNP)</span>
+                    <span class="emergency-number">117 or (02) 8722-0650</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Bureau of Fire Protection (BFP)</span>
+                    <span class="emergency-number">(02) 8426-0219 or (02) 8426-0246</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Coast Guard (PCG)</span>
+                    <span class="emergency-number">(02) 8527-3877</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">DSWD</span>
+                    <span class="emergency-number">(02) 8931-8101</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">PAGASA (Weather Updates)</span>
+                    <span class="emergency-number">(02) 8284-0800</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="copyright">
+            <p>© 2025 SPC Alerts • To God Be The Glory</p>
+        </div>
+    </footer>
+    <script src="../javascript/keep-alive.js" type="module"></script>
+</body>
+</html>

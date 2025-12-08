@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Incident Reports - SPC Alerts</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css?v=13">
+
+  <!-- FREE Reverse Geocoding (Required for real addresses) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/photon-js@1.0.1/dist/photon.min.js"></script>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/img/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/icon-192.png">
+  <script src="../javascript/pwa.js" defer></script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      // Try absolute path first
+      let registration = await navigator.serviceWorker.register('/service-worker.js', {
+        scope: '/'
+      });
+      console.log('✅ Service Worker registered:', registration.scope);
+      
+      // Wait for it to be ready
+      await navigator.serviceWorker.ready;
+      console.log('✅ Service Worker ready');
+      
+    } catch (err) {
+      console.error('❌ Service Worker registration failed:', err);
+      
+      // Fallback: try relative path
+      try {
+        const registration = await navigator.serviceWorker.register('../../../service-worker.js', {
+          scope: '/'
+        });
+        console.log('✅ Service Worker registered (fallback):', registration.scope);
+      } catch (fallbackErr) {
+        console.error('❌ Fallback also failed:', fallbackErr);
+      }
+    }
+  });
+}
+</script>
+</head>
+<body>
+  <!-- Admin Header with Navigation Tabs -->
+  <header class="admin-header">
+    <div class="admin-container">
+      <div class="dashboard-header">
+        <h1>SPC Alerts</h1>
+
+        <div class="header-right">
+            <div class="admin-badge">
+                <i class="fas fa-user-shield"></i> Administrator
+            </div>
+
+          <!-- Navigation Tabs -->
+          <div class="admin-nav-tabs">
+            <a href="admin-dashboard.html" class="nav-tab">
+              <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="admin-users.html" class="nav-tab">
+              <i class="fas fa-users"></i> Users
+            </a>
+            <a href="admin-incident.html" class="nav-tab active">
+              <i class="fas fa-exclamation-triangle"></i> Incidents
+            </a>
+            <a href="admin-sos.html" class="nav-tab">
+              <i class="fas fa-ambulance"></i> SOS
+            </a>
+          </div>
+
+          <div class="header-actions">
+            <button id="installBtn" class="install-btn" style="display:none;">
+                <i class="fas fa-download"></i>
+            </button>
+            <button class="logout-btn" onclick="logout()">
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+
+      <!-- Page Title -->
+      <div style="margin-bottom: 32px; text-align: center;">
+        <h2 style="color: var(--admin); font-size: 2rem; margin: 0;">
+          Incident Reports
+        </h2>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="admin-actions-incidents" style="margin-bottom: 32px; text-align: right;">
+        <button class="action-btn" id="exportCsvBtn">
+          <i class="fas fa-file-csv"></i> Export to CSV
+        </button>
+        <button class="action-btn" style="background: #dc3545; margin-left: 12px;" id="clearAllBtn">
+          <i class="fas fa-trash-alt"></i> Clear All Reports
+        </button>
+      </div>
+        <!-- Search and Filter -->
+        <!-- Replace the incident type filter section in admin-incident.html -->
+      <div class="admin-actions-incidents" style="margin-bottom:24px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+          <input type="text" id="incidentSearch" placeholder="Search description or type..." style="padding:12px 16px; border:2px solid #ddd; border-radius:12px; width:320px; max-width:100%;">
+            <select id="incidentTypeFilter" style="padding:12px; border:2px solid #ddd; border-radius:12px;">
+              <option value="all">All Types</option>
+              <option value="Hazard(Fire, Electrical, Gas, etc)">Hazard (Fire, Electrical, Gas, etc)</option>
+              <option value="Medical">Medical</option>
+              <option value="Accident">Accident</option>
+              <option value="Crime">Crime</option>
+              <option value="Other Types of Incidents">Other Types of Incidents</option>
+            </select>
+      </div>
+        
+      <!-- Incidents Table -->
+      <div class="incidents-list">
+        <table>
+          <thead>
+            <tr>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Location</th>
+                <th>Reporter</th>
+                <th>Date & Time</th>
+                <th>Photo</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+          <tbody>
+            <!-- Filled dynamically by admin.js -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State Message (optional, shown by JS if no data) -->
+      <div id="noIncidents" style="text-align:center; padding:60px 20px; color:#888; display:none;">
+        <i class="fas fa-check-circle" style="font-size:4rem; color:var(--success); margin-bottom:20px;"></i>
+        <h3>No incident reports yet</h3>
+        <p>The system is running smoothly. All is calm!</p>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+        <div class="footer-emergency">
+            <h3>EMERGENCY PHONE NUMBERS</h3>
+            <div class="emergency-list">
+                <div class="emergency-item">
+                    <span class="emergency-label">National Emergency Hotline</span>
+                    <span class="emergency-number">911</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Red Cross (PRC)</span>
+                    <span class="emergency-number">143 or (02) 8790-2300</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">NDRRMC</span>
+                    <span class="emergency-number">(02) 8911-5061 to 65</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine National Police (PNP)</span>
+                    <span class="emergency-number">117 or (02) 8722-0650</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Bureau of Fire Protection (BFP)</span>
+                    <span class="emergency-number">(02) 8426-0219 or (02) 8426-0246</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Coast Guard (PCG)</span>
+                    <span class="emergency-number">(02) 8527-3877</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">DSWD</span>
+                    <span class="emergency-number">(02) 8931-8101</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">PAGASA (Weather Updates)</span>
+                    <span class="emergency-number">(02) 8284-0800</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="copyright">
+            <p>© 2025 SPC Alerts • To God Be The Glory</p>
+        </div>
+    </footer>
+
+  <!-- Supabase Client (unchanged) -->
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+    const supabaseUrl = 'https://oqmfjwlpuwfpbnpiavhp.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTgxNzYsImV4cCI6MjA3OTQ3NDE3Nn0.yywiH3q3g1Rbyypt5mxvhRgDXZrSFENZn5s1EWVp8Z8';
+    window.supabase = createClient(supabaseUrl, supabaseAnonKey);
+    window.dispatchEvent(new Event('supabase-ready'));
+  </script>
+
+  <!-- Your existing inline scripts (CSV export, clear all) remain unchanged -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Export to CSV (unchanged)
+      document.getElementById('exportCsvBtn')?.addEventListener('click', async () => {
+        try {
+          const { data } = await window.supabase
+            .from('incidents')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!data || data.length === 0) {
+            alert('No incidents to export.');
+            return;
+          }
+
+          const csv = [
+            ['ID', 'Type', 'Description', 'Latitude', 'Longitude', 'Photo URL', 'Reported By', 'Date & Time'],
+            ...data.map(i => [
+              i.id,
+              i.type || 'General',
+              `"${(i.description || '').replace(/"/g, '""')}"`,
+              i.location?.lat || '',
+              i.location?.lng || '',
+              i.photo_url || '',
+              i.reported_by || '',
+              new Date(i.created_at).toLocaleString('en-PH')
+            ])
+          ].map(row => row.join(',')).join('\r\n');
+
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `SPC-Incidents-${new Date().toISOString().slice(0,10)}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          alert('Export failed: ' + err.message);
+        }
+      });
+
+      // Clear All Reports (unchanged)
+      document.getElementById('clearAllBtn')?.addEventListener('click', async () => {
+        if (!confirm('WARNING: This will permanently delete ALL incident reports and photos. This cannot be undone!\n\nAre you absolutely sure?')) return;
+        if (!confirm('Final confirmation: Type "DELETE ALL" to proceed.')) return;
+        if (prompt('Type "DELETE ALL" to confirm:') !== 'DELETE ALL') {
+          alert('Cancelled.');
+          return;
+        }
+
+        try {
+          const { error } = await window.supabase.from('incidents').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          if (error) throw error;
+          alert('All incident reports have been permanently deleted.');
+          location.reload();
+        } catch (err) {
+          alert('Error: ' + err.message);
+        }
+      });
+    });
+  </script>
+
+  <script src="../javascript/admin.js" defer></script>
+  <script src="../javascript/keep-alive.js" type="module"></script>
+
+</body>
+</html>

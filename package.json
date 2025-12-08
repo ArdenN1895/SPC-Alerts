@@ -1,0 +1,16 @@
+{
+  "name": "spc-alerts",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "live-server public"
+  },
+  "description": "",
+  "main": "service-worker.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.84.0"
+  }
+}

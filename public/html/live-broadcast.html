@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Broadcast - SPC Alerts</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="../css/live-broadcast.css">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/img/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="SPC Alerts">
+    <link rel="apple-touch-icon" href="/img/icon-192.png">
+
+    <!-- PWA Install Button (shared) -->
+    <script src="../javascript/pwa.js" defer></script>
+
+    <!-- Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(() => console.log('SW registered'))
+            .catch(err => console.log('SW failed:', err));
+        });
+      }
+</script>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-top">
+            <div class="logo">
+                <a href="index.html">SPC Alerts</a>
+            </div>
+            <div class="header-actions">
+                <button id="installBtn" class="install-btn" style="display:none;">
+                    <i class="fas fa-download"></i>
+                </button>
+                <a href="#" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <nav>   
+        <div class="nav-container">
+            <ul class="main-nav" id="mainNav">
+                <li><a href="map.html">Map</a></li>
+                <li><a href="live-broadcast.html" class="active">Live Broadcast</a></li>
+                <li><a href="news-outlet.html">News Outlet</a></li>
+                <li><a href="donation.html">Donation</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="about-us.html">About Us</a></li>
+            </ul>
+
+            <button class="burger" id="burgerBtn">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="broadcast-container">
+        <div class="broadcast-header">
+            <div class="broadcast-title">
+                <h1><i class="fas fa-broadcast-tower"></i> Live Weather Broadcast</h1>
+                <p>Real-time weather monitoring and emergency alerts for the Philippines</p>
+            </div>
+            <div class="broadcast-controls">
+                <button class="btn btn-primary" id="refreshBtn">
+                    <i class="fas fa-sync-alt"></i> Refresh Data
+                </button>
+                <button class="btn btn-secondary" id="fullscreenBtn">
+                    <i class="fas fa-expand"></i> Fullscreen
+                </button>
+            </div>
+        </div>
+
+        <div class="alert-banner" id="alertBanner">
+            <div class="alert-content">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div class="alert-text">
+                    <strong>MONITORING MODE:</strong> Real-time weather tracking active
+                </div>
+            </div>
+            <div class="alert-time" id="currentTime">Loading...</div>
+        </div>
+
+        <div class="broadcast-grid">
+            <!-- LEFT COLUMN -->
+            <div class="broadcast-column">
+                <div class="broadcast-card weather-card">
+                    <div class="card-header">
+                        <h3>Current Conditions</h3>
+                        <div class="location-selector">
+                            <select id="citySelector">
+                                <option value="San Pablo City" selected>San Pablo City</option>
+                                <option value="Manila">Metro Manila</option>
+                                <option value="Cebu">Cebu City</option>
+                                <option value="Davao">Davao City</option>
+                                <option value="Cagayan de Oro">Cagayan de Oro</option>
+                                <option value="Zamboanga">Zamboanga City</option>
+                                <option value="Tacloban">Tacloban</option>
+                                <option value="Baguio">Baguio</option>
+                                <option value="Iloilo">Iloilo City</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body" id="currentWeather">
+                        <div class="loading">
+                            <i class="fas fa-spinner fa-spin"></i> Loading current weather data...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="broadcast-card alerts-card">
+                    <div class="card-header">
+                        <h3> Emergency Alerts</h3>
+                        <span class="alert-badge" id="alertCount">0</span>
+                    </div>
+                    <div class="card-body" id="emergencyAlerts">
+                        <div class="no-alerts">
+                            <i class="fas fa-check-circle"></i>
+                            <p>No active emergency alerts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CENTER COLUMN -->
+            <div class="broadcast-column">
+                <div class="broadcast-card map-card">
+                    <div class="card-header">
+                        <h3> Weather Map</h3>
+                        <div class="map-controls">
+                            <button class="map-btn active" data-layer="precipitation">Rain</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- This will be replaced by Leaflet map -->
+                        <div id="weatherMap" style="height: 300px; width: 100%;">
+                            <div class="map-placeholder">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <p>Loading interactive weather map...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="broadcast-card forecast-card">
+                    <div class="card-header">
+                        <h3> 5-Day Forecast</h3>
+                    </div>
+                    <div class="card-body" id="forecastData">
+                        <div class="loading">
+                            <i class="fas fa-spinner fa-spin"></i> Loading forecast data...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div class="broadcast-column">
+                <div class="broadcast-card stats-card">
+                    <div class="card-header">
+                        <h3> Weather Statistics</h3>
+                    </div>
+                    <div class="card-body" id="weatherStats">
+                        <div class="stat-item">
+                            <div class="stat-label">Max Temperature</div>
+                            <div class="stat-value" id="maxTemp">--°C</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Min Temperature</div>
+                            <div class="stat-value" id="minTemp">--°C</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Average Humidity</div>
+                            <div class="stat-value" id="avgHumidity">--%</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Rainfall Total</div>
+                            <div class="stat-value" id="rainTotal">-- mm</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="broadcast-card updates-card">
+                    <div class="card-header">
+                        <h3> Live Updates</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="updates-feed" id="updatesFeed">
+                            <div class="update-item">
+                                <div class="update-time">Just now</div>
+                                <div class="update-content">
+                                    <i class="fas fa-info-circle"></i> System initialized and monitoring
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <i class="fas fa-satellite-dish"></i>
+                <span>API Status: <span class="status-online" id="apiStatus">Connected</span></span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-database"></i>
+                <span>Last Update: <span id="lastUpdate">--</span></span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-shield-alt"></i>
+                <span>System: <span class="status-secure">Secure</span></span>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-emergency">
+            <h3>EMERGENCY PHONE NUMBERS</h3>
+            <div class="emergency-list">
+                <div class="emergency-item">
+                    <span class="emergency-label">National Emergency Hotline</span>
+                    <span class="emergency-number">911</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Red Cross (PRC)</span>
+                    <span class="emergency-number">143 or (02) 8790-2300</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">NDRRMC</span>
+                    <span class="emergency-number">(02) 8911-5061 to 65</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine National Police (PNP)</span>
+                    <span class="emergency-number">117 or (02) 8722-0650</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Bureau of Fire Protection (BFP)</span>
+                    <span class="emergency-number">(02) 8426-0219 or (02) 8426-0246</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Coast Guard (PCG)</span>
+                    <span class="emergency-number">(02) 8527-3877</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">DSWD</span>
+                    <span class="emergency-number">(02) 8931-8101</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">PAGASA (Weather Updates)</span>
+                    <span class="emergency-number">(02) 8284-0800</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="copyright">
+            <p>© 2025 SPC Alerts • To God Be The Glory</p>
+        </div>
+    </footer>
+
+    <!-- Your Live Broadcast Script -->
+    <script src="../javascript/live-broadcast.js"></script>
+
+    <!-- Logout Handler -->
+    <script>
+        document.querySelectorAll('.logout').forEach(el => {
+            el.addEventListener('click', e => {
+                e.preventDefault();
+                if (confirm('Logout from SPC Alerts?')) {
+                    localStorage.clear();
+                    window.location.href = '../html/login.html';
+                }
+            });
+        });
+    </script>
+
+    <!-- Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try {
+                    let registration = await navigator.serviceWorker.register('/service-worker.js', {
+                        scope: '/'
+                    });
+                    console.log('✅ Service Worker registered:', registration.scope);
+                    await navigator.serviceWorker.ready;
+                    console.log('✅ Service Worker ready');
+                } catch (err) {
+                    console.error('❌ Service Worker registration failed:', err);
+                }
+            });
+        }
+    </script>
+    <script src="../javascript/keep-alive.js" type="module"></script>
+</body>
+</html>

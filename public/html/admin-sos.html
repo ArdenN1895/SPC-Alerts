@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOS Management - SPC Alerts</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/admin-dashboard.css?v=12">
+  <link rel="stylesheet" href="../css/admin-sos.css?v=1">
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/img/icon-192.png">
+  <link rel="apple-touch-icon" href="/img/icon-192.png">
+  <script src="../javascript/pwa.js" defer></script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      let registration = await navigator.serviceWorker.register('/service-worker.js', {
+        scope: '/'
+      });
+      console.log('✅ Service Worker registered:', registration.scope);
+      await navigator.serviceWorker.ready;
+      console.log('✅ Service Worker ready');
+    } catch (err) {
+      console.error('❌ Service Worker registration failed:', err);
+      try {
+        const registration = await navigator.serviceWorker.register('../../../service-worker.js', {
+          scope: '/'
+        });
+        console.log('✅ Service Worker registered (fallback):', registration.scope);
+      } catch (fallbackErr) {
+        console.error('❌ Fallback also failed:', fallbackErr);
+      }
+    }
+  });
+}
+</script>
+</head>
+<body>
+  <!-- Admin Header with Navigation Tabs -->
+  <header class="admin-header">
+    <div class="admin-container">
+      <div class="dashboard-header">
+        <h1><i class="fas fa-shield-alt"></i> SPC Alerts</h1>
+
+        <div class="header-right">
+            <div class="admin-badge">
+                <i class="fas fa-user-shield"></i> Administrator
+            </div>
+
+          <!-- Navigation Tabs -->
+          <div class="admin-nav-tabs">
+            <a href="admin-dashboard.html" class="nav-tab">
+              <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="admin-users.html" class="nav-tab">
+              <i class="fas fa-users"></i> Users
+            </a>
+            <a href="admin-incident.html" class="nav-tab">
+              <i class="fas fa-exclamation-triangle"></i> Incidents
+            </a>
+            <a href="admin-sos.html" class="nav-tab active">
+              <i class="fas fa-ambulance"></i> SOS
+            </a>
+          </div>
+
+          <div class="header-actions">
+            <button id="installBtn" class="install-btn" style="display:none;">
+              <i class="fas fa-download"></i>
+            </button>
+            <button class="logout-btn" onclick="logout()">
+              <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div class="admin-container">
+
+      <!-- Page Title -->
+      <div style="margin-bottom: 32px; text-align: center;">
+        <h2 style="color: var(--admin); font-size: 2rem; margin: 0;">
+          Emergency SOS Management
+        </h2>
+      </div>
+
+      <!-- Stats Cards -->
+      <div class="sos-stats-grid">
+        <div class="sos-stat-card waiting">
+          <div class="stat-icon"><i class="fas fa-clock"></i></div>
+          <div class="stat-info">
+            <h3 id="waitingCount">0</h3>
+            <p>Waiting</p>
+          </div>
+        </div>
+        <div class="sos-stat-card dispatched">
+          <div class="stat-icon"><i class="fas fa-truck-medical"></i></div>
+          <div class="stat-info">
+            <h3 id="dispatchedCount">0</h3>
+            <p>Dispatched</p>
+          </div>
+        </div>
+        <div class="sos-stat-card arrived">
+          <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+          <div class="stat-info">
+            <h3 id="arrivedCount">0</h3>
+            <p>Arrived</p>
+          </div>
+        </div>
+        <div class="sos-stat-card total">
+          <div class="stat-icon"><i class="fas fa-list"></i></div>
+          <div class="stat-info">
+            <h3 id="totalCount">0</h3>
+            <p>Total Today</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search and Filter -->
+      <div class="admin-actions" style="margin-bottom:24px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+        <input type="text" id="sosSearch" placeholder="Search by name or location..." style="padding:12px 16px; border:2px solid #ddd; border-radius:12px; width:300px; max-width:100%;">
+        <select id="sosStatusFilter" style="padding:12px; border:2px solid #ddd; border-radius:12px;">
+          <option value="all">All Status</option>
+          <option value="waiting">Waiting</option>
+          <option value="dispatched">Dispatched</option>
+          <option value="arrived">Arrived</option>
+        </select>
+        <button id="refreshBtn" class="action-btn" style="margin-left: auto;">
+          <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+      </div>
+
+      <!-- SOS Table -->
+      <div class="sos-list">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Sender</th>
+              <th>Contact</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="sosTableBody">
+            <tr>
+              <td colspan="6" style="text-align:center;padding:40px;color:#666;">Loading SOS requests...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-emergency">
+      <h3>EMERGENCY PHONE NUMBERS</h3>
+      <div class="emergency-list">
+        <div class="emergency-item">
+          <span class="emergency-label">National Emergency Hotline</span>
+          <span class="emergency-number">911</span>
+        </div>
+        <div class="emergency-item">
+          <span class="emergency-label">Philippine Red Cross (PRC)</span>
+          <span class="emergency-number">143 or (02) 8790-2300</span>
+        </div>
+        <div class="emergency-item">
+          <span class="emergency-label">NDRRMC</span>
+          <span class="emergency-number">(02) 8911-5061 to 65</span>
+        </div>
+        <div class="emergency-item">
+          <span class="emergency-label">Philippine National Police (PNP)</span>
+          <span class="emergency-number">117 or (02) 8722-0650</span>
+        </div>
+        <div class="emergency-item">
+          <span class="emergency-label">Bureau of Fire Protection (BFP)</span>
+          <span class="emergency-number">(02) 8426-0219 or (02) 8426-0246</span>
+        </div>
+        <div class="emergency-item">
+          <span class="emergency-label">Philippine Coast Guard (PCG)</span>
+          <span class="emergency-number">(02) 8527-3877</span>
+        </div>
+        <div class="emergency-item">
+          <span class="emergency-label">DSWD</span>
+          <span class="emergency-number">(02) 8931-8101</span>
+        </div>
+        <div class="emergency-item">
+          <span class="emergency-label">PAGASA (Weather Updates)</span>
+          <span class="emergency-number">(02) 8284-0800</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="copyright">
+      <p>© 2025 SPC Alerts • To God Be The Glory</p>
+    </div>
+  </footer>
+
+  <!-- Status Update Modal -->
+  <div id="statusModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Update SOS Status</h2>
+        <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="sosId">
+        <div class="form-group">
+          <label>Current Status</label>
+          <p id="currentStatus" style="font-size: 18px; font-weight: 600; color: var(--admin);"></p>
+        </div>
+        <div class="form-group">
+          <label>Update To</label>
+          <select id="newStatus" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px;">
+            <option value="waiting">Waiting</option>
+            <option value="dispatched">Dispatched</option>
+            <option value="arrived">Arrived</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-save" id="updateStatusBtn">Update Status</button>
+          <button type="button" class="btn-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase Client -->
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+    const supabaseUrl = 'https://oqmfjwlpuwfpbnpiavhp.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTgxNzYsImV4cCI6MjA3OTQ3NDE3Nn0.yywiH3q3g1Rbyypt5mxvhRgDXZrSFENZn5s1EWVp8Z8';
+    window.supabase = createClient(supabaseUrl, supabaseAnonKey);
+    window.supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' && !location.pathname.includes('login.html')) {
+        location.href = '/public/html/login.html';
+      }
+    });
+    window.dispatchEvent(new Event('supabase-ready'));
+  </script>
+
+  <script src="../javascript/admin.js" defer></script>
+  <script src="../javascript/admin-sos.js" defer></script>
+  <script src="../javascript/keep-alive.js" type="module"></script>
+  
+</body>
+</html>

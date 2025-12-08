@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Push Notification Diagnostics</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        h1 {
+            color: #00ff00;
+            border-bottom: 2px solid #00ff00;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+        }
+        .error {
+            border-left-color: #ff0000;
+            background: rgba(255, 0, 0, 0.1);
+            color: #ff0000;
+        }
+        .warning {
+            border-left-color: #ffff00;
+            background: rgba(255, 255, 0, 0.1);
+            color: #ffff00;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            margin: 10px 5px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+        button:hover { background: #00cc00; }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        pre {
+            background: #111;
+            padding: 10px;
+            overflow-x: auto;
+            border: 1px solid #333;
+            margin: 10px 0;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        .step h3 {
+            color: #00ffff;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Push Notification Diagnostic Tool</h1>
+        
+        <div class="step">
+            <h3>Step 1: Environment Check</h3>
+            <button onclick="checkEnvironment()">Run Check</button>
+            <div id="env-results"></div>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Service Worker Status</h3>
+            <button onclick="checkServiceWorker()">Check SW</button>
+            <div id="sw-results"></div>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Push Subscription</h3>
+            <button onclick="checkSubscription()">Check Subscription</button>
+            <button onclick="createSubscription()">Create New</button>
+            <div id="sub-results"></div>
+        </div>
+
+        <div class="step">
+            <h3>Step 4: Database Check</h3>
+            <button onclick="checkDatabase()">Check DB</button>
+            <div id="db-results"></div>
+        </div>
+
+        <div class="step">
+            <h3>Step 5: Test Push</h3>
+            <button onclick="testPush()">Send Test</button>
+            <div id="push-results"></div>
+        </div>
+
+        <div class="step">
+            <h3>Quick Fix Actions</h3>
+            <button onclick="clearAndResubscribe()">Clear & Resubscribe</button>
+            <button onclick="unregisterSW()">Unregister SW</button>
+            <div id="fix-results"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        const VAPID_PUBLIC_KEY = "BA1RcIbho_qDHz-TEjBmAAG73hbLnI0ACtV_U0kZdT9z_Bnnx_FEEFH1ZsCb_I-IIRWIF3PClSoKe4DUKq5bPQQ";
+        
+        function log(id, message, type = 'status') {
+            const el = document.getElementById(id);
+            el.innerHTML += `<div class="${type}">${message}</div>`;
+        }
+
+        window.checkEnvironment = () => {
+            const id = 'env-results';
+            document.getElementById(id).innerHTML = '';
+            
+            log(id, '🔍 Checking browser capabilities...');
+            log(id, `- Service Worker: ${'serviceWorker' in navigator ? '✅' : '❌'}`, 
+                'serviceWorker' in navigator ? 'status' : 'error');
+            log(id, `- Push Manager: ${'PushManager' in window ? '✅' : '❌'}`, 
+                'PushManager' in window ? 'status' : 'error');
+            log(id, `- Notifications: ${'Notification' in window ? '✅' : '❌'}`, 
+                'Notification' in window ? 'status' : 'error');
+            log(id, `- Permission: ${Notification.permission}`, 
+                Notification.permission === 'granted' ? 'status' : 'warning');
+            log(id, `- HTTPS: ${location.protocol === 'https:' ? '✅' : '❌'}`, 
+                location.protocol === 'https:' ? 'status' : 'error');
+        };
+
+        window.checkServiceWorker = async () => {
+            const id = 'sw-results';
+            document.getElementById(id).innerHTML = '';
+            
+            try {
+                log(id, '🔍 Checking service worker...');
+                const registration = await navigator.serviceWorker.getRegistration();
+                
+                if (!registration) {
+                    log(id, '❌ No service worker registered', 'error');
+                    return;
+                }
+                
+                log(id, `✅ Service Worker: ${registration.active?.scriptURL || 'Unknown'}`);
+                log(id, `- State: ${registration.active?.state || 'Unknown'}`);
+                log(id, `- Scope: ${registration.scope}`);
+                
+                const ready = await navigator.serviceWorker.ready;
+                log(id, `✅ Service Worker is ready`);
+            } catch (err) {
+                log(id, `❌ Error: ${err.message}`, 'error');
+            }
+        };
+
+        window.checkSubscription = async () => {
+            const id = 'sub-results';
+            document.getElementById(id).innerHTML = '';
+            
+            try {
+                log(id, '🔍 Checking push subscription...');
+                const registration = await navigator.serviceWorker.ready;
+                const subscription = await registration.pushManager.getSubscription();
+                
+                if (!subscription) {
+                    log(id, '❌ No active subscription', 'warning');
+                    return;
+                }
+                
+                log(id, '✅ Active subscription found');
+                log(id, `Endpoint: ${subscription.endpoint.substring(0, 60)}...`);
+                log(id, `<pre>${JSON.stringify({
+                    endpoint: subscription.endpoint,
+                    keys: {
+                        p256dh: subscription.getKey('p256dh') ? '✅ Present' : '❌ Missing',
+                        auth: subscription.getKey('auth') ? '✅ Present' : '❌ Missing'
+                    }
+                }, null, 2)}</pre>`);
+            } catch (err) {
+                log(id, `❌ Error: ${err.message}`, 'error');
+            }
+        };
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+        }
+
+        window.createSubscription = async () => {
+            const id = 'sub-results';
+            document.getElementById(id).innerHTML = '';
+            
+            try {
+                log(id, '📱 Creating new subscription...');
+                
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    log(id, '❌ Permission denied', 'error');
+                    return;
+                }
+                
+                const registration = await navigator.serviceWorker.ready;
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                });
+                
+                log(id, '✅ Subscription created!');
+                log(id, `<pre>${JSON.stringify(subscription.toJSON(), null, 2)}</pre>`);
+            } catch (err) {
+                log(id, `❌ Error: ${err.message}`, 'error');
+            }
+        };
+
+        window.checkDatabase = async () => {
+            const id = 'db-results';
+            document.getElementById(id).innerHTML = '';
+            
+            try {
+                log(id, '🔍 Checking database...');
+                
+                if (!window.supabase) {
+                    log(id, '❌ Supabase not loaded', 'error');
+                    return;
+                }
+                
+                const { data: { user } } = await window.supabase.auth.getUser();
+                if (!user) {
+                    log(id, '❌ Not logged in', 'error');
+                    return;
+                }
+                
+                log(id, `✅ Logged in as: ${user.email}`);
+                
+                const { data, error } = await window.supabase
+                    .from('push_subscriptions')
+                    .select('*')
+                    .eq('user_id', user.id);
+                
+                if (error) {
+                    log(id, `❌ Database error: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log(id, `✅ Found ${data?.length || 0} subscription(s) in database`);
+                if (data && data.length > 0) {
+                    log(id, `<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                }
+            } catch (err) {
+                log(id, `❌ Error: ${err.message}`, 'error');
+            }
+        };
+
+        window.testPush = async () => {
+            const id = 'push-results';
+            document.getElementById(id).innerHTML = '';
+            
+            try {
+                log(id, '📤 Sending test push...');
+                
+                const response = await fetch('https://oqmfjwlpuwfpbnpiavhp.supabase.co/functions/v1/send-push', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTgxNzYsImV4cCI6MjA3OTQ3NDE3Nn0.yywiH3q3g1Rbyypt5mxvhRgDXZrSFENZn5s1EWVp8Z8',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTgxNzYsImV4cCI6MjA3OTQ3NDE3Nn0.yywiH3q3g1Rbyypt5mxvhRgDXZrSFENZn5s1EWVp8Z8'
+                    },
+                    body: JSON.stringify({
+                        title: 'Diagnostic Test',
+                        body: 'If you see this, push works!',
+                        icon: '/img/icon-192.png'
+                    })
+                });
+                
+                const result = await response.json();
+                log(id, `Response: ${response.status} ${response.statusText}`);
+                log(id, `<pre>${JSON.stringify(result, null, 2)}</pre>`);
+                
+                if (result.delivered_to > 0) {
+                    log(id, '✅ Push notification delivered!', 'status');
+                } else {
+                    log(id, '❌ Push failed to deliver', 'error');
+                }
+            } catch (err) {
+                log(id, `❌ Error: ${err.message}`, 'error');
+            }
+        };
+
+        window.clearAndResubscribe = async () => {
+            const id = 'fix-results';
+            document.getElementById(id).innerHTML = '';
+            
+            try {
+                log(id, '🧹 Clearing old subscription...');
+                const registration = await navigator.serviceWorker.ready;
+                const sub = await registration.pushManager.getSubscription();
+                
+                if (sub) {
+                    await sub.unsubscribe();
+                    log(id, '✅ Unsubscribed');
+                }
+                
+                log(id, '📱 Creating new subscription...');
+                await createSubscription();
+                
+                log(id, '✅ Done! Now try sending a push notification.');
+            } catch (err) {
+                log(id, `❌ Error: ${err.message}`, 'error');
+            }
+        };
+
+        window.unregisterSW = async () => {
+            const id = 'fix-results';
+            document.getElementById(id).innerHTML = '';
+            
+            try {
+                log(id, '🗑️ Unregistering service worker...');
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                
+                for (const registration of registrations) {
+                    await registration.unregister();
+                    log(id, `✅ Unregistered: ${registration.scope}`);
+                }
+                
+                log(id, '✅ Done! Refresh the page and log in again.');
+            } catch (err) {
+                log(id, `❌ Error: ${err.message}`, 'error');
+            }
+        };
+    </script>
+</body>
+
+</html>
+

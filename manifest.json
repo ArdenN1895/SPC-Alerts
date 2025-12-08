@@ -1,0 +1,74 @@
+{
+  "name": "SPC Alerts - San Pablo City Disaster Alerts",
+  "short_name": "SPC Alerts",
+  "description": "Real-time disaster alerts and emergency notifications for San Pablo City, Laguna",
+  "start_url": "/public/html/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#005ea5",
+  "theme_color": "#005ea5",
+  "prefer_related_applications": false,
+  "categories": ["news", "utilities", "safety"],
+  "lang": "en-PH",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/public/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/public/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Report Incident",
+      "short_name": "Report",
+      "description": "Quickly report an emergency or incident",
+      "url": "/public/html/incident-report.html",
+      "icons": [
+        {
+          "src": "/public/img/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "View Map",
+      "short_name": "Map",
+      "description": "View incident map",
+      "url": "/public/html/map.html",
+      "icons": [
+        {
+          "src": "/public/img/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/public/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "share_target": {
+    "action": "/public/html/incident-report.html",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}

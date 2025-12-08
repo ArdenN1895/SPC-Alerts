@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="SPC Alerts">
+    <title>SPC Alerts</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/incident-report.css">
+    
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/img/icon-192.png">
+    <link rel="apple-touch-icon" href="/img/icon-192.png">
+
+    <!-- SOS Button -->
+    <script type="module" src="../javascript/sos.js"></script>
+
+    <!-- PWA Install Button -->
+    <script src="../javascript/pwa.js" defer></script>
+
+    <script type="module">
+      import '../javascript/supabase.js';
+    </script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      // Try absolute path first
+      let registration = await navigator.serviceWorker.register('/service-worker.js', {
+        scope: '/'
+      });
+      console.log('✅ Service Worker registered:', registration.scope);
+      
+      // Wait for it to be ready
+      await navigator.serviceWorker.ready;
+      console.log('✅ Service Worker ready');
+      
+    } catch (err) {
+      console.error('❌ Service Worker registration failed:', err);
+      
+      // Fallback: try relative path
+      try {
+        const registration = await navigator.serviceWorker.register('../../../service-worker.js', {
+          scope: '/'
+        });
+        console.log('✅ Service Worker registered (fallback):', registration.scope);
+      } catch (fallbackErr) {
+        console.error('❌ Fallback also failed:', fallbackErr);
+      }
+    }
+  });
+}
+</script>
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <div class="logo">
+                <a href="index.html">SPC Alerts</a>
+            </div>
+            <div class="header-actions">
+                <button id="installBtn" class="install-btn" style="display:none;"><i class="fas fa-download"></i></button>
+                <a href="#" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <nav>   
+    <div class="nav-container">
+
+        <ul class="main-nav" id="mainNav">
+            <li><a href="map.html">Map</a></li>
+            <li><a href="live-broadcast.html">Live Broadcast</a></li>
+            <li><a href="news-outlet.html">News Outlet</a></li>
+            <li><a href="donation.html">Donation</a></li>
+            <li><a href="profile.html">Profile</a></li>
+            <li><a href="about-us.html">About Us</a></li>
+        </ul>
+
+        <button class="burger" id="burgerBtn">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+    </div>
+</nav>
+
+    <main class="container">
+        <div class="report-card">
+            <h2><i class="fas fa-exclamation-circle"></i> Report an Incident</h2>
+            <p>Please fill in the details below. Your report will help keep San Pablo City safe.</p>
+
+                <form id="incidentForm" enctype="multipart/form-data">
+    <div class="form-group">
+        <label for="type">Incident Type <span class="required">*</span></label>
+        <select id="type" required>
+            <option value="">-- Select Type --</option>
+            <option value="Hazard(Fire, Electrical, Gas, etc)">Hazard(Fire, Electrical, Gas, etc)</option>
+            <option value="Medical">Medical</option>
+            <option value="Accident">Accident</option>
+            <option value="Crime">Crime</option>
+            <option value="Other Types of Incidents">Other Types of Incidents</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description <span class="required">*</span></label>
+        <textarea id="description" rows="5" placeholder="Describe what happened..." required></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="incidentPhoto">Attach Photo (optional)</label>
+        <input type="file" id="incidentPhoto" accept="image/*" capture="environment">
+        <div id="photoPreview" style="margin-top:10px; display:none;">
+            <img id="previewImg" src="" alt="Preview" style="max-width:100%; max-height:300px; border-radius:8px;">
+            <button type="button" id="removePhoto" style="margin-top:8px; color:#d32f2f; font-size:0.9em;">Remove photo</button>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="location">Location <span class="required">*</span></label>
+        <input type="text" id="locationInput" placeholder="Getting your location..." readonly>
+        <button type="button" id="getLocationBtn" class="btn-location">
+            Use My Current Location
+        </button><br><br>
+        <i class="fas fa-exclamation-triangle"></i><strong>Revised Penal Code (RPC) - Article 154: </strong><br>Punishes publishing false news that endangers public order or harms state interests, with arresto mayor (1-6 months) and hefty fines (P40,000 - P200,000).
+        </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary submit-btn">
+            Submit Report
+        </button>
+        <button type="button" class="btn btn-outline" onclick="window.location.href='index.html'">
+            Cancel
+        </button>
+    </div>
+</form>
+
+            <div id="statusMessage" class="status-message" style="display:none;"></div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-emergency">
+            <h3>EMERGENCY PHONE NUMBERS</h3>
+            <div class="emergency-list">
+                <div class="emergency-item">
+                    <span class="emergency-label">National Emergency Hotline</span>
+                    <span class="emergency-number">911</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Red Cross (PRC)</span>
+                    <span class="emergency-number">143 or (02) 8790-2300</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">NDRRMC</span>
+                    <span class="emergency-number">(02) 8911-5061 to 65</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine National Police (PNP)</span>
+                    <span class="emergency-number">117 or (02) 8722-0650</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Bureau of Fire Protection (BFP)</span>
+                    <span class="emergency-number">(02) 8426-0219 or (02) 8426-0246</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">Philippine Coast Guard (PCG)</span>
+                    <span class="emergency-number">(02) 8527-3877</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">DSWD</span>
+                    <span class="emergency-number">(02) 8931-8101</span>
+                </div>
+                <div class="emergency-item">
+                    <span class="emergency-label">PAGASA (Weather Updates)</span>
+                    <span class="emergency-number">(02) 8284-0800</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="copyright">
+            <p>© 2025 SPC Alerts • To God Be The Glory</p>
+        </div>
+    </footer>
+
+    <script type="module" src="../javascript/incident-report.js"></script>
+    <script>
+        document.querySelectorAll('.logout').forEach(el => {
+            el.addEventListener('click', e => {
+                e.preventDefault();
+                if (confirm('Logout from SPC Alerts?')) {
+                    localStorage.clear();
+                    window.location.href = '../html/login.html';
+                }
+            });
+        });
+    </script>
+    
+    <script type="module">
+  import { initPushNotifications } from '../javascript/push.js';
+  window.addEventListener('supabase-ready', () => {
+    setTimeout(initPushNotifications, 3000); // after login
+  });
+</script>
+    <script src="../javascript/keep-alive.js" type="module"></script>
+</body>
+</html>
