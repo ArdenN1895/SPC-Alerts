@@ -69,87 +69,90 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   // ==================== FORM SUBMISSION ====================
-  form.onsubmit = async e => {
-    e.preventDefault();
-    
-    const incidentType = document.getElementById('type').value;
-    const description = document.getElementById('description').value.trim();
+  // FIXED: Form submission in incident-report.js
+form.onsubmit = async e => {
+  e.preventDefault();
+  
+  const incidentType = document.getElementById('type').value;
+  const description = document.getElementById('description').value.trim();
 
-    // Validation
-    if (!incidentType || !description) {
-      return showStatus('Please fill in all required fields', 'error');
+  if (!incidentType || !description) {
+    return showStatus('Please fill in all required fields', 'error');
+  }
+
+  if (!currentPosition && !locationInput.value.trim()) {
+    return showStatus('Please provide a location', 'error');
+  }
+
+  const submitBtn = form.querySelector('.submit-btn');
+  const originalBtnText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting...';
+
+  showStatus('Uploading incident report...', 'loading');
+
+  try {
+    let photoUrl = null;
+
+    // Upload photo
+    if (photoFile) {
+      showStatus('Uploading photo...', 'loading');
+      
+      const ext = photoFile.name.split('.').pop();
+      const filename = `${user.id}/${Date.now()}.${ext}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('incident-photos')
+        .upload(filename, photoFile, { upsert: true });
+
+      if (uploadError && !uploadError.message.includes('duplicate')) {
+        console.error('Photo upload error:', uploadError);
+        showStatus('Warning: Photo upload failed, continuing without photo', 'warning');
+      } else {
+        const { data: { publicUrl } } = supabase.storage
+          .from('incident-photos')
+          .getPublicUrl(filename);
+        
+        photoUrl = publicUrl;
+        console.log('✅ Photo uploaded:', photoUrl);
+      }
     }
 
-    if (!currentPosition && !locationInput.value.trim()) {
-      return showStatus('Please provide a location', 'error');
-    }
+    // Save to database
+    showStatus('Saving incident report...', 'loading');
 
-    // Disable submit button to prevent double submission
-    const submitBtn = form.querySelector('.submit-btn');
-    const originalBtnText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Submitting...';
+    const incidentData = {
+      type: incidentType,
+      description: description,
+      location: currentPosition || { manual: locationInput.value.trim() },
+      photo_url: photoUrl,
+      reported_by: user.id
+    };
 
-    showStatus('Uploading incident report...', 'loading');
+    const { data: insertedIncident, error: dbError } = await supabase
+      .from('incidents')
+      .insert(incidentData)
+      .select()
+      .single();
+
+    if (dbError) throw dbError;
+
+    console.log('✅ Incident saved to database:', insertedIncident.id);
+
+    // Send push notifications
+    showStatus('Notifying users...', 'loading');
 
     try {
-      let photoUrl = null;
+      // ✅ FIX: Get ALL subscribed users
+      const { data: subscribers, error: subError } = await supabase
+        .from('push_subscriptions')
+        .select('user_id');
 
-      // ==================== UPLOAD PHOTO ====================
-      if (photoFile) {
-        showStatus('Uploading photo...', 'loading');
-        
-        const ext = photoFile.name.split('.').pop();
-        const filename = `${user.id}/${Date.now()}.${ext}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('incident-photos')
-          .upload(filename, photoFile, { upsert: true });
-
-        if (uploadError && !uploadError.message.includes('duplicate')) {
-          console.error('Photo upload error:', uploadError);
-          showStatus('Warning: Photo upload failed, continuing without photo', 'warning');
-        } else {
-          const { data: { publicUrl } } = supabase.storage
-            .from('incident-photos')
-            .getPublicUrl(filename);
-          
-          photoUrl = publicUrl;
-          console.log('✅ Photo uploaded:', photoUrl);
-        }
-      }
-
-      // ==================== SAVE TO DATABASE ====================
-      showStatus('Saving incident report...', 'loading');
-
-      const incidentData = {
-        type: incidentType,
-        description: description,
-        location: currentPosition || { manual: locationInput.value.trim() },
-        photo_url: photoUrl,
-        reported_by: user.id
-      };
-
-      const { data: insertedIncident, error: dbError } = await supabase
-        .from('incidents')
-        .insert(incidentData)
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-
-      console.log('✅ Incident saved to database:', insertedIncident.id);
-
-      // ==================== SEND PUSH NOTIFICATIONS ====================
-      showStatus('Notifying users...', 'loading');
-
-      try {
-        // Get fresh session token
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError || !session?.access_token) {
-          console.warn('⚠️ Session error, push may fail:', sessionError);
-        }
+      if (subError) {
+        console.warn('⚠️ Could not fetch subscribers:', subError);
+      } else if (subscribers && subscribers.length > 0) {
+        const userIds = [...new Set(subscribers.map(s => s.user_id))];
+        console.log(`📢 Notifying ${userIds.length} subscribed user(s)`);
 
         // Format location for notification
         let locationText = 'San Pablo City';
@@ -159,81 +162,68 @@ document.addEventListener('DOMContentLoaded', async () => {
           locationText = locationInput.value.trim().substring(0, 30);
         }
 
-        // Prepare notification payload
-        const notificationPayload = {
-          title: '🚨 New Incident Reported',
-          body: `${incidentType} reported in ${locationText}. ${description.substring(0, 80)}${description.length > 80 ? '...' : ''}`,
-          icon: '/public/img/icon-192.png',
-          badge: '/public/img/badge-72.png',
-          image: photoUrl || undefined,
-          url: '/public/html/index.html', // Open map to show incident location
-          data: {
-            incidentId: insertedIncident.id,
-            incidentType: incidentType,
-            timestamp: Date.now()
+        // Send via Edge Function
+        const notificationResult = await supabase.functions.invoke('send-push', {
+          body: {
+            title: '🚨 New Incident Reported',
+            body: `${incidentType} reported in ${locationText}. ${description.substring(0, 80)}${description.length > 80 ? '...' : ''}`,
+            icon: '/public/img/icon-192.png',
+            badge: '/public/img/badge-72.png',
+            image: photoUrl || undefined,
+            url: '/public/html/index.html',
+            data: {
+              incidentId: insertedIncident.id,
+              incidentType: incidentType,
+              timestamp: Date.now()
+            },
+            user_ids: userIds // ✅ FIX: Include user_ids array
           }
-        };
-
-        console.log('📤 Sending push notification...', notificationPayload);
-
-        // Call Edge Function
-        const pushResponse = await fetch('https://oqmfjwlpuwfpbnpiavhp.supabase.co/functions/v1/send-push', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTgxNzYsImV4cCI6MjA3OTQ3NDE3Nn0.yywiH3q3g1Rbyypt5mxvhRgDXZrSFENZn5s1EWVp8Z8'
-          },
-          body: JSON.stringify(notificationPayload)
         });
 
-        const pushResult = await pushResponse.json();
-        console.log('📊 Push notification result:', pushResult);
+        console.log('📊 Push notification result:', notificationResult);
 
-        if (pushResponse.ok) {
-          if (pushResult.delivered_to > 0) {
-            console.log(`✅ Push notifications sent to ${pushResult.delivered_to} user(s)`);
-          } else {
-            console.warn('⚠️ No users subscribed to push notifications');
-          }
+        if (notificationResult.error) {
+          console.error('❌ Push failed:', notificationResult.error);
+        } else if (notificationResult.data?.delivered_to > 0) {
+          console.log(`✅ Notifications sent to ${notificationResult.data.delivered_to} user(s)`);
         } else {
-          console.error('❌ Push notification failed:', pushResult.error);
+          console.warn('⚠️ No users received notifications');
         }
-
-      } catch (pushError) {
-        // Don't fail the whole submission if push fails
-        console.error('⚠️ Push notification error (non-critical):', pushError);
+      } else {
+        console.log('📭 No subscribers to notify');
       }
 
-      // ==================== SUCCESS ====================
-      showStatus('✅ Report submitted successfully! Thank you for helping keep San Pablo City safe.', 'success');
-
-      // Reset form after 2 seconds
-      setTimeout(() => {
-        form.reset();
-        photoPreview.style.display = 'none';
-        currentPosition = null;
-        photoFile = null;
-        locationInput.setAttribute('readonly', 'readonly');
-        getLocationBtn.style.background = '';
-        getLocationBtn.textContent = 'Use My Current Location';
-        getLocationBtn.disabled = false;
-        
-        // Optionally redirect to map
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 2000);
-      }, 2000);
-
-    } catch (err) {
-      console.error('❌ Submission error:', err);
-      showStatus('Error: ' + (err.message || 'Failed to submit report. Please try again.'), 'error');
-      
-      // Re-enable submit button on error
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalBtnText;
+    } catch (pushError) {
+      console.error('⚠️ Push notification error (non-critical):', pushError);
     }
-  };
+
+    // Success
+    showStatus('✅ Report submitted successfully! Thank you for helping keep San Pablo City safe.', 'success');
+
+    // Reset form
+    setTimeout(() => {
+      form.reset();
+      photoPreview.style.display = 'none';
+      currentPosition = null;
+      photoFile = null;
+      locationInput.setAttribute('readonly', 'readonly');
+      getLocationBtn.style.background = '';
+      getLocationBtn.textContent = 'Use My Current Location';
+      getLocationBtn.disabled = false;
+      
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
+    }, 2000);
+
+  } catch (err) {
+    console.error('❌ Submission error:', err);
+    showStatus('Error: ' + (err.message || 'Failed to submit report. Please try again.'), 'error');
+    
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalBtnText;
+  }
+};
 
   // ==================== STATUS MESSAGE ====================
   function showStatus(msg, type = 'info') {
