@@ -68,8 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
   };
 
-  // ==================== FORM SUBMISSION ====================
-  // FIXED: Form submission in incident-report.js
+// ==================== FORM SUBMISSION (FIXED SECTION) ====================
 form.onsubmit = async e => {
   e.preventDefault();
   
@@ -94,7 +93,7 @@ form.onsubmit = async e => {
   try {
     let photoUrl = null;
 
-    // Upload photo
+    // ... (Photo upload logic remains the same)
     if (photoFile) {
       showStatus('Uploading photo...', 'loading');
       
@@ -139,58 +138,46 @@ form.onsubmit = async e => {
 
     console.log('✅ Incident saved to database:', insertedIncident.id);
 
-    // Send push notifications
+    // Send push notifications - SIMPLIFIED BROADCAST
     showStatus('Notifying users...', 'loading');
 
     try {
-      // ✅ FIX: Get ALL subscribed users
-      const { data: subscribers, error: subError } = await supabase
-        .from('push_subscriptions')
-        .select('user_id');
+      // Format location for notification
+      let locationText = 'San Pablo City';
+      if (currentPosition) {
+        locationText = `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`;
+      } else if (locationInput.value.trim()) {
+        locationText = locationInput.value.trim().substring(0, 30);
+      }
 
-      if (subError) {
-        console.warn('⚠️ Could not fetch subscribers:', subError);
-      } else if (subscribers && subscribers.length > 0) {
-        const userIds = [...new Set(subscribers.map(s => s.user_id))];
-        console.log(`📢 Notifying ${userIds.length} subscribed user(s)`);
-
-        // Format location for notification
-        let locationText = 'San Pablo City';
-        if (currentPosition) {
-          locationText = `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`;
-        } else if (locationInput.value.trim()) {
-          locationText = locationInput.value.trim().substring(0, 30);
-        }
-
-        // Send via Edge Function
-        const notificationResult = await supabase.functions.invoke('send-push', {
-          body: {
-            title: '🚨 New Incident Reported',
-            body: `${incidentType} reported in ${locationText}. ${description.substring(0, 80)}${description.length > 80 ? '...' : ''}`,
-            icon: '/public/img/icon-192.png',
-            badge: '/public/img/badge-72.png',
-            image: photoUrl || undefined,
-            url: '/public/html/index.html',
-            data: {
-              incidentId: insertedIncident.id,
-              incidentType: incidentType,
-              timestamp: Date.now()
-            },
-            user_ids: userIds // ✅ FIX: Include user_ids array
+      // 💡 FIX: Use the 'send-push' Edge Function for BROADCAST.
+      // We explicitly DO NOT pass the user_ids array, which tells 
+      // the Edge Function (index.ts) to fetch ALL subscribers.
+      const notificationResult = await supabase.functions.invoke('send-push', {
+        body: {
+          title: '🚨 New Incident Reported',
+          body: `${incidentType} reported in ${locationText}. ${description.substring(0, 80)}${description.length > 80 ? '...' : ''}`,
+          icon: '/public/img/icon-192.png',
+          badge: '/public/img/badge-72.png',
+          image: photoUrl || undefined,
+          url: '/public/html/index.html',
+          data: {
+            incidentId: insertedIncident.id,
+            incidentType: incidentType,
+            timestamp: Date.now()
           }
-        });
-
-        console.log('📊 Push notification result:', notificationResult);
-
-        if (notificationResult.error) {
-          console.error('❌ Push failed:', notificationResult.error);
-        } else if (notificationResult.data?.delivered_to > 0) {
-          console.log(`✅ Notifications sent to ${notificationResult.data.delivered_to} user(s)`);
-        } else {
-          console.warn('⚠️ No users received notifications');
+          // REMOVED: user_ids: userIds 
         }
+      });
+
+      console.log('📊 Push notification result:', notificationResult);
+
+      if (notificationResult.error) {
+        console.error('❌ Push failed:', notificationResult.error);
+      } else if (notificationResult.data?.delivered_to > 0) {
+        console.log(`✅ Notifications broadcasted to ${notificationResult.data.delivered_to} user(s)`);
       } else {
-        console.log('📭 No subscribers to notify');
+        console.warn('⚠️ No users received notifications (or no subscribers found)');
       }
 
     } catch (pushError) {
