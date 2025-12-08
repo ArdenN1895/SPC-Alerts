@@ -443,37 +443,24 @@ function setupQuickActions(supabase, session) {
 
     sendAlertBtn.disabled = true;
     sendAlertBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-    showStatus('Preparing to send alert...', 'loading');
+    showStatus('Preparing to send broadcast alert...', 'loading');
 
     try {
-      // Step 1: Get ALL subscribed users (for broadcast)
-      const { data: subscribers, error: subError } = await supabase
-        .from('push_subscriptions')
-        .select('user_id');
+      // 💡 FIX: Removed database queries for push_subscriptions.
+      // We are forcing a broadcast by NOT providing the 'user_ids' property.
+      
+      console.log(`📢 Initiating BROADCAST alert: ${title}`);
 
-      if (subError) throw subError;
+      showStatus(`Sending alert to all subscribed users...`, 'loading');
 
-      if (!subscribers || subscribers.length === 0) {
-        showStatus('No users are subscribed to notifications', 'error');
-        sendAlertBtn.disabled = false;
-        sendAlertBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Alert';
-        return;
-      }
-
-      // Extract unique user IDs
-      const userIds = [...new Set(subscribers.map(s => s.user_id))];
-      console.log(`📢 Broadcasting to ${userIds.length} subscribed user(s)`);
-
-      showStatus(`Sending alert to ${userIds.length} user(s)...`, 'loading');
-
-      // Step 2: Get fresh session
+      // Step 1: Get fresh session (good practice)
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !currentSession?.access_token) {
         throw new Error('Authentication failed. Please log in again.');
       }
 
-      // Step 3: Call Edge Function with user_ids array
+      // Step 2: Call Edge Function without user_ids array
       const response = await supabase.functions.invoke('send-push', {
         body: {
           title: `🚨 ${title}`,
@@ -482,7 +469,7 @@ function setupQuickActions(supabase, session) {
           badge: isUrgent ? '/public/img/urgent-badge.png' : '/public/img/badge-72.png',
           url: '/public/html/index.html',
           urgency: isUrgent ? 'high' : 'normal',
-          user_ids: userIds // ✅ FIX: Include user_ids for targeted delivery
+          // REMOVED: user_ids: userIds <-- Absence triggers broadcast in index.ts
         }
       });
 
@@ -496,13 +483,13 @@ function setupQuickActions(supabase, session) {
 
       if (result.delivered_to > 0) {
         showStatus(
-          `✅ Alert sent successfully!\n\nDelivered: ${result.delivered_to} users\nFailed: ${result.failed || 0}`,
+          `✅ Broadcast Alert sent successfully!\n\nDelivered: ${result.delivered_to} users\nFailed: ${result.failed || 0}`,
           'success'
         );
         setTimeout(() => closeModal(), 3000);
       } else {
         showStatus(
-          `⚠️ Alert sent but no users received it.\nSubscriptions found: ${result.total_subscriptions}\nFailed: ${result.failed || 0}`,
+          `⚠️ Alert sent but no users received it.\nTotal Subscriptions: ${result.total_subscriptions}\nFailed: ${result.failed || 0}`,
           'warning'
         );
       }
