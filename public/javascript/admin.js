@@ -384,6 +384,7 @@ function setupRealtime(table, callback) {
 }
 
 
+// FIXED: setupQuickActions function in admin.js
 function setupQuickActions(supabase, session) {
   const alertModal = document.getElementById('alertModal');
   const alertForm = document.getElementById('alertForm');
@@ -396,13 +397,11 @@ function setupQuickActions(supabase, session) {
   const alertStatus = document.getElementById('alertStatus');
   const sendAlertBtn = document.getElementById('sendAlertBtn');
 
-  // Open modal when "Send Alert" button is clicked
   document.querySelector('.action-btn:nth-child(1)')?.addEventListener('click', () => {
     alertModal.classList.add('show');
     alertTitle.focus();
   });
 
-  // Close modal handlers
   const closeModal = () => {
     alertModal.classList.remove('show');
     alertStatus.style.display = 'none';
@@ -412,24 +411,16 @@ function setupQuickActions(supabase, session) {
 
   document.getElementById('closeAlertModal')?.addEventListener('click', closeModal);
   document.getElementById('cancelAlertBtn')?.addEventListener('click', closeModal);
-
-  // Close on outside click
   alertModal.addEventListener('click', (e) => {
     if (e.target === alertModal) closeModal();
   });
-
-  // Close on Escape key
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && alertModal.classList.contains('show')) {
-      closeModal();
-    }
+    if (e.key === 'Escape' && alertModal.classList.contains('show')) closeModal();
   });
 
-  // Update preview in real-time
   const updatePreview = () => {
     previewTitle.textContent = alertTitle.value.trim() || 'Emergency Alert';
     previewMessage.textContent = alertMessage.value.trim() || 'Please stay safe and follow official instructions.';
-    
     const remaining = 200 - alertMessage.value.length;
     charCount.textContent = `${remaining} characters remaining`;
     charCount.style.color = remaining < 20 ? '#d32f2f' : '#666';
@@ -438,7 +429,6 @@ function setupQuickActions(supabase, session) {
   alertTitle.addEventListener('input', updatePreview);
   alertMessage.addEventListener('input', updatePreview);
 
-  // Form submission
   alertForm.onsubmit = async (e) => {
     e.preventDefault();
 
@@ -451,65 +441,74 @@ function setupQuickActions(supabase, session) {
       return;
     }
 
-    // Disable button and show loading
     sendAlertBtn.disabled = true;
     sendAlertBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-    showStatus('Sending alert notification...', 'loading');
+    showStatus('Preparing to send alert...', 'loading');
 
     try {
-      console.log('Sending push notification...');
+      // Step 1: Get ALL subscribed users (for broadcast)
+      const { data: subscribers, error: subError } = await supabase
+        .from('push_subscriptions')
+        .select('user_id');
 
-      // Get fresh session token
+      if (subError) throw subError;
+
+      if (!subscribers || subscribers.length === 0) {
+        showStatus('No users are subscribed to notifications', 'error');
+        sendAlertBtn.disabled = false;
+        sendAlertBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Alert';
+        return;
+      }
+
+      // Extract unique user IDs
+      const userIds = [...new Set(subscribers.map(s => s.user_id))];
+      console.log(`📢 Broadcasting to ${userIds.length} subscribed user(s)`);
+
+      showStatus(`Sending alert to ${userIds.length} user(s)...`, 'loading');
+
+      // Step 2: Get fresh session
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !currentSession?.access_token) {
         throw new Error('Authentication failed. Please log in again.');
       }
 
-      console.log('Auth token obtained');
-
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTgxNzYsImV4cCI6MjA3OTQ3NDE3Nn0.yywiH3q3g1Rbyypt5mxvhRgDXZrSFENZn5s1EWVp8Z8';
-
-      // Call edge function
-      const response = await fetch('https://oqmfjwlpuwfpbnpiavhp.supabase.co/functions/v1/send-push', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentSession.access_token}`,
-          'apikey': ANON_KEY
-        },
-        body: JSON.stringify({
-          title: `🚨${title}`,
+      // Step 3: Call Edge Function with user_ids array
+      const response = await supabase.functions.invoke('send-push', {
+        body: {
+          title: `🚨 ${title}`,
           body: body,
           icon: '/public/img/icon-192.png',
-          badge: isUrgent ? '/img/urgent-badge.png' : '/img/badge-72.png',
+          badge: isUrgent ? '/public/img/urgent-badge.png' : '/public/img/badge-72.png',
           url: '/public/html/index.html',
-          urgency: isUrgent ? 'high' : 'normal'
-        })
+          urgency: isUrgent ? 'high' : 'normal',
+          user_ids: userIds // ✅ FIX: Include user_ids for targeted delivery
+        }
       });
 
-      console.log('Response status:', response.status);
+      console.log('Response:', response);
 
-      const result = await response.json();
-      console.log('Response data:', result);
+      if (response.error) {
+        throw new Error(response.error.message || 'Push notification failed');
+      }
 
-      if (response.ok) {
+      const result = response.data;
+
+      if (result.delivered_to > 0) {
         showStatus(
-          `Alert sent successfully!\n\nDelivered to: ${result.delivered_to || 0} users\nTotal subscriptions: ${result.total_subscriptions || 0}\nFailed: ${result.failed || 0}`,
+          `✅ Alert sent successfully!\n\nDelivered: ${result.delivered_to} users\nFailed: ${result.failed || 0}`,
           'success'
         );
-
-        // Reset form after 3 seconds
-        setTimeout(() => {
-          closeModal();
-        }, 3000);
-
+        setTimeout(() => closeModal(), 3000);
       } else {
-        throw new Error(result.error || result.message || 'Push failed');
+        showStatus(
+          `⚠️ Alert sent but no users received it.\nSubscriptions found: ${result.total_subscriptions}\nFailed: ${result.failed || 0}`,
+          'warning'
+        );
       }
 
     } catch (err) {
-      console.error('âŒ Push error:', err);
+      console.error('❌ Alert error:', err);
       showStatus('Failed to send alert: ' + err.message, 'error');
     } finally {
       sendAlertBtn.disabled = false;
@@ -517,14 +516,13 @@ function setupQuickActions(supabase, session) {
     }
   };
 
-  // Status message helper
   function showStatus(message, type) {
     alertStatus.textContent = message;
     alertStatus.className = `alert-status ${type}`;
     alertStatus.style.display = 'block';
   }
 
-  // Generate Report button (keep existing functionality)
+  // Generate Report button
   document.querySelector('.action-btn:nth-child(2)')?.addEventListener('click', async () => {
     const { data } = await supabase.from('incidents').select('*').order('created_at', { ascending: false });
     if (!data?.length) return alert('No incidents to export');
