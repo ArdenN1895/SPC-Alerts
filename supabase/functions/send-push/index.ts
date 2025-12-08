@@ -1,6 +1,6 @@
 // supabase/functions/send-push/index.ts
 // UNIFIED VERSION: Handles both targeted (user_ids) and broadcast (all users) notifications
-// Uses web-push library for proper VAPID signing (mobile-compatible)
+// FIX: Refactored to use Promise.allSettled() for concurrent sending to prevent Edge Function timeout on broadcast.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -25,7 +25,7 @@ serve(async (req) => {
     );
   }
 
-  console.log("📬 ===== PUSH NOTIFICATION REQUEST =====");
+  console.log("📬 ===== PUSH NOTIFICATION REQUEST (CONCURRENT) =====");
 
   try {
     // Get environment variables
@@ -34,11 +34,8 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    console.log("🔑 Environment check:");
-    console.log("- VAPID_PUBLIC_KEY:", vapidPublic ? "✅ Set" : "❌ Missing");
-    console.log("- VAPID_PRIVATE_KEY:", vapidPrivate ? "✅ Set" : "❌ Missing");
-
     if (!vapidPublic || !vapidPrivate) {
+      console.error("❌ VAPID keys not configured");
       return new Response(
         JSON.stringify({ error: "VAPID keys not configured" }), 
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -69,8 +66,9 @@ serve(async (req) => {
     console.log(`📨 Notification: "${title}" - "${body}"`);
     
     // Determine notification type
-    if (user_ids && Array.isArray(user_ids) && user_ids.length > 0) {
-      console.log(`🎯 TARGETED notification to ${user_ids.length} specific user(s):`, user_ids);
+    const isTargeted = user_ids && Array.isArray(user_ids) && user_ids.length > 0;
+    if (isTargeted) {
+      console.log(`🎯 TARGETED notification to ${user_ids.length} specific user(s)`);
     } else {
       console.log(`📢 BROADCAST notification to ALL subscribed users`);
     }
@@ -86,14 +84,14 @@ serve(async (req) => {
     // Create Supabase client
     const supabase = createClient(supabaseUrl!, supabaseKey!);
     
-    // Fetch subscriptions based on whether user_ids is provided
+    // Fetch subscriptions
     let query = supabase.from("push_subscriptions").select("id, user_id, subscription");
     
-    if (user_ids && Array.isArray(user_ids) && user_ids.length > 0) {
+    if (isTargeted) {
       // TARGETED: Only fetch subscriptions for specified users
       query = query.in('user_id', user_ids);
     }
-    // If no user_ids, fetch ALL subscriptions (broadcast)
+    // If not targeted, fetch ALL subscriptions (broadcast)
 
     const { data: subscriptions, error: fetchError } = await query;
 
@@ -108,7 +106,7 @@ serve(async (req) => {
     console.log(`📊 Found ${subscriptions?.length || 0} subscription(s)`);
 
     if (!subscriptions || subscriptions.length === 0) {
-      const message = user_ids 
+      const message = isTargeted
         ? `No subscribers found for specified users: ${user_ids.join(', ')}`
         : "No subscribers found in the system";
       
@@ -116,10 +114,10 @@ serve(async (req) => {
       
       return new Response(
         JSON.stringify({ 
-          success: true, // Don't fail if no subscribers
+          success: true, 
           delivered_to: 0, 
           message,
-          notification_type: user_ids ? 'targeted' : 'broadcast',
+          notification_type: isTargeted ? 'targeted' : 'broadcast',
           targeted_users: user_ids || null
         }), 
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -144,28 +142,27 @@ serve(async (req) => {
     let failed = 0;
     const errors: Array<{id: string, user_id: string, error: string}> = [];
 
-    // Send notifications to all subscriptions
-    for (const { id, user_id, subscription } of subscriptions) {
+    // ==========================================================
+    // 💡 FIX: Use Promise.allSettled() for concurrent sending
+    // ==========================================================
+    const sendPromises = subscriptions.map(({ id, user_id, subscription }) => (async () => {
       try {
-        console.log(`\n📤 Sending to user ${user_id} (subscription ${id})...`);
-        
         // Parse subscription if it's a string
         const sub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
-        console.log(`- Endpoint: ${sub.endpoint.substring(0, 50)}...`);
         
-        // ✅ Use web-push library to send (handles VAPID signing automatically)
-        const result = await webpush.sendNotification(
+        // Send the notification
+        await webpush.sendNotification(
           sub,
           notificationPayload,
           {
             TTL: 86400, // 24 hours
-            urgency: urgency, // "very-low", "low", "normal", or "high"
+            urgency: urgency,
             contentEncoding: "aes128gcm"
           }
         );
-
-        console.log(`✅ Delivered successfully to user ${user_id} (status: ${result.statusCode})`);
-        delivered++;
+        
+        // Update shared counter (acceptable in this pattern)
+        delivered++; 
 
       } catch (error: any) {
         console.error(`❌ Failed for user ${user_id}:`, error.message);
@@ -175,14 +172,20 @@ serve(async (req) => {
         // Remove invalid/expired subscriptions
         if (error.statusCode === 410 || error.statusCode === 404) {
           console.log(`🗑️ Removing invalid subscription ${id} for user ${user_id}`);
+          // Await the deletion to ensure database cleanup happens
           await supabase.from("push_subscriptions").delete().eq("id", id);
         }
       }
-    }
+    })());
+
+    // Wait for ALL promises (notification attempts) to settle
+    await Promise.allSettled(sendPromises);
+
+    // ==========================================================
 
     // Log final results
     console.log(`\n📊 FINAL RESULTS:`);
-    console.log(`- Notification type: ${user_ids ? 'TARGETED' : 'BROADCAST'}`);
+    console.log(`- Notification type: ${isTargeted ? 'TARGETED' : 'BROADCAST'}`);
     console.log(`- Delivered: ${delivered}`);
     console.log(`- Failed: ${failed}`);
     console.log(`- Total subscriptions: ${subscriptions.length}`);
@@ -193,7 +196,7 @@ serve(async (req) => {
         delivered_to: delivered,
         failed: failed,
         total_subscriptions: subscriptions.length,
-        notification_type: user_ids ? 'targeted' : 'broadcast',
+        notification_type: isTargeted ? 'targeted' : 'broadcast',
         targeted_users: user_ids || null,
         errors: errors.length > 0 ? errors : undefined
       }), 
