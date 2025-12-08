@@ -1,5 +1,6 @@
 // supabase/functions/send-push/index.ts
-// UPDATED: Supports both targeted (user_ids) and broadcast (all users) notifications
+// UNIFIED VERSION: Handles both targeted (user_ids) and broadcast (all users) notifications
+// Uses web-push library for proper VAPID signing (mobile-compatible)
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -12,6 +13,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
@@ -26,6 +28,7 @@ serve(async (req) => {
   console.log("📬 ===== PUSH NOTIFICATION REQUEST =====");
 
   try {
+    // Get environment variables
     const vapidPublic = Deno.env.get("VAPID_PUBLIC_KEY");
     const vapidPrivate = Deno.env.get("VAPID_PRIVATE_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -42,13 +45,14 @@ serve(async (req) => {
       );
     }
 
-    // ✅ Configure web-push with VAPID keys
+    // Configure web-push with VAPID keys
     webpush.setVapidDetails(
       "mailto:admin@spcalerts.com",
       vapidPublic,
       vapidPrivate
     );
 
+    // Parse request body
     const requestData = await req.json();
     const { 
       title, 
@@ -58,17 +62,20 @@ serve(async (req) => {
       image, 
       url = "/public/html/index.html",
       data,
-      user_ids // Optional: if provided, send only to these users; if not, send to ALL
+      urgency = "normal",
+      user_ids // Optional: if provided = targeted, if not = broadcast to ALL
     } = requestData;
 
     console.log(`📨 Notification: "${title}" - "${body}"`);
     
-    if (user_ids && Array.isArray(user_ids)) {
+    // Determine notification type
+    if (user_ids && Array.isArray(user_ids) && user_ids.length > 0) {
       console.log(`🎯 TARGETED notification to ${user_ids.length} specific user(s):`, user_ids);
     } else {
-      console.log(`📢 BROADCAST notification to ALL users`);
+      console.log(`📢 BROADCAST notification to ALL subscribed users`);
     }
 
+    // Validate required fields
     if (!title || !body) {
       return new Response(
         JSON.stringify({ error: "title and body are required" }), 
@@ -76,6 +83,7 @@ serve(async (req) => {
       );
     }
 
+    // Create Supabase client
     const supabase = createClient(supabaseUrl!, supabaseKey!);
     
     // Fetch subscriptions based on whether user_ids is provided
@@ -102,20 +110,23 @@ serve(async (req) => {
     if (!subscriptions || subscriptions.length === 0) {
       const message = user_ids 
         ? `No subscribers found for specified users: ${user_ids.join(', ')}`
-        : "No subscribers found";
+        : "No subscribers found in the system";
+      
+      console.log("⚠️", message);
       
       return new Response(
         JSON.stringify({ 
-          success: true, 
+          success: true, // Don't fail if no subscribers
           delivered_to: 0, 
           message,
-          broadcast: !user_ids,
+          notification_type: user_ids ? 'targeted' : 'broadcast',
           targeted_users: user_ids || null
         }), 
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Prepare notification payload
     const notificationPayload = JSON.stringify({ 
       title, 
       body, 
@@ -124,26 +135,31 @@ serve(async (req) => {
       image, 
       url,
       data: data || {},
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      tag: `spc-alert-${Date.now()}`, // Unique tag for each notification
+      requireInteraction: urgency === 'high'
     });
 
     let delivered = 0;
     let failed = 0;
     const errors: Array<{id: string, user_id: string, error: string}> = [];
 
+    // Send notifications to all subscriptions
     for (const { id, user_id, subscription } of subscriptions) {
       try {
         console.log(`\n📤 Sending to user ${user_id} (subscription ${id})...`);
         
+        // Parse subscription if it's a string
         const sub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
         console.log(`- Endpoint: ${sub.endpoint.substring(0, 50)}...`);
         
-        // ✅ Use web-push library to send
+        // ✅ Use web-push library to send (handles VAPID signing automatically)
         const result = await webpush.sendNotification(
           sub,
           notificationPayload,
           {
-            TTL: 86400,
+            TTL: 86400, // 24 hours
+            urgency: urgency, // "very-low", "low", "normal", or "high"
             contentEncoding: "aes128gcm"
           }
         );
@@ -156,7 +172,7 @@ serve(async (req) => {
         failed++;
         errors.push({ id, user_id, error: error.message });
 
-        // Remove invalid subscriptions
+        // Remove invalid/expired subscriptions
         if (error.statusCode === 410 || error.statusCode === 404) {
           console.log(`🗑️ Removing invalid subscription ${id} for user ${user_id}`);
           await supabase.from("push_subscriptions").delete().eq("id", id);
@@ -164,6 +180,7 @@ serve(async (req) => {
       }
     }
 
+    // Log final results
     console.log(`\n📊 FINAL RESULTS:`);
     console.log(`- Notification type: ${user_ids ? 'TARGETED' : 'BROADCAST'}`);
     console.log(`- Delivered: ${delivered}`);
@@ -176,7 +193,7 @@ serve(async (req) => {
         delivered_to: delivered,
         failed: failed,
         total_subscriptions: subscriptions.length,
-        broadcast: !user_ids,
+        notification_type: user_ids ? 'targeted' : 'broadcast',
         targeted_users: user_ids || null,
         errors: errors.length > 0 ? errors : undefined
       }), 
