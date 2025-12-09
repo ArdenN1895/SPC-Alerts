@@ -1,4 +1,4 @@
-// incident-report.js - TRUE BROADCAST VERSION (Mobile Compatible)
+// incident-report.js - FIXED FOR MOBILE (Absolute URLs)
 
 document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('incidentForm');
@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const previewImg = document.getElementById('previewImg');
   const photoPreview = document.getElementById('photoPreview');
   const removePhotoBtn = document.getElementById('removePhoto');
+
+  // ✅ Get the current origin for absolute URLs
+  const APP_ORIGIN = window.location.origin;
 
   let currentPosition = null;
   let photoFile = null;
@@ -68,7 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
   };
 
-  // ==================== FORM SUBMISSION (TRUE BROADCAST) ====================
+  // ==================== FORM SUBMISSION (MOBILE FIXED) ====================
   form.onsubmit = async e => {
     e.preventDefault();
     
@@ -138,11 +141,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       console.log('✅ Incident saved to database:', insertedIncident.id);
 
-      // ==================== BROADCAST PUSH NOTIFICATION ====================
+      // ==================== BROADCAST PUSH NOTIFICATION (MOBILE FIXED) ====================
       showStatus('Broadcasting to all users...', 'loading');
 
       try {
-        // Format location for notification
+        // Format location for notification (keep short for mobile)
         let locationText = 'San Pablo City';
         if (currentPosition) {
           locationText = `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`;
@@ -150,27 +153,32 @@ document.addEventListener('DOMContentLoaded', async () => {
           locationText = locationInput.value.trim().substring(0, 30);
         }
 
-        // Mobile-friendly notification body (short and concise)
+        // ✅ Mobile-friendly notification body (short and concise)
         const notificationBody = `${incidentType} in ${locationText}`;
+
+        // ✅ CRITICAL FIX: Use absolute URLs for mobile compatibility
+        const notificationPayload = {
+          title: '🚨 New Incident Report',
+          body: notificationBody,
+          icon: `${APP_ORIGIN}/public/img/icon-192.png`, // ✅ Absolute URL
+          badge: `${APP_ORIGIN}/public/img/badge-72.png`, // ✅ Absolute URL
+          image: photoUrl || undefined, // Photo URL is already absolute from Supabase
+          url: `${APP_ORIGIN}/public/html/index.html`, // ✅ Absolute URL
+          urgency: 'high', // High priority for mobile
+          data: {
+            incidentId: insertedIncident.id,
+            incidentType: incidentType,
+            location: currentPosition || locationInput.value.trim(),
+            timestamp: Date.now()
+          }
+          // ✅ NO user_ids = BROADCAST to ALL subscribers
+        };
+
+        console.log('📤 Notification payload:', notificationPayload);
 
         // ✅ TRUE BROADCAST: DO NOT include user_ids
         const notificationResult = await supabase.functions.invoke('send-push', {
-          body: {
-            title: '🚨 New Incident Report',
-            body: notificationBody,
-            icon: '/public/img/icon-192.png',
-            badge: '/public/img/badge-72.png',
-            image: photoUrl || undefined,
-            url: '/public/html/index.html',
-            urgency: 'high', // High priority for mobile
-            data: {
-              incidentId: insertedIncident.id,
-              incidentType: incidentType,
-              location: currentPosition || locationInput.value.trim(),
-              timestamp: Date.now()
-            }
-            // ✅ NO user_ids = BROADCAST to ALL subscribers
-          }
+          body: notificationPayload
         });
 
         console.log('📊 Broadcast result:', notificationResult);
