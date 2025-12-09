@@ -384,8 +384,6 @@ function setupRealtime(table, callback) {
 }
 
 
-// admin.js - setupQuickActions function (BROADCAST ALERT - MOBILE COMPATIBLE)
-
 function setupQuickActions(supabase, session) {
   const alertModal = document.getElementById('alertModal');
   const alertForm = document.getElementById('alertForm');
@@ -397,6 +395,9 @@ function setupQuickActions(supabase, session) {
   const charCount = document.getElementById('charCount');
   const alertStatus = document.getElementById('alertStatus');
   const sendAlertBtn = document.getElementById('sendAlertBtn');
+
+  // ✅ Get the current origin for absolute URLs
+  const APP_ORIGIN = window.location.origin;
 
   // Open modal
   document.querySelector('.action-btn:nth-child(1)')?.addEventListener('click', () => {
@@ -433,7 +434,7 @@ function setupQuickActions(supabase, session) {
   alertTitle.addEventListener('input', updatePreview);
   alertMessage.addEventListener('input', updatePreview);
 
-  // ==================== BROADCAST ALERT SUBMISSION ====================
+  // ==================== BROADCAST ALERT SUBMISSION (MOBILE FIXED) ====================
   alertForm.onsubmit = async (e) => {
     e.preventDefault();
 
@@ -453,22 +454,29 @@ function setupQuickActions(supabase, session) {
     try {
       console.log('📢 Starting broadcast alert to ALL users...');
 
+      // ✅ CRITICAL FIX: Use absolute URLs for mobile compatibility
+      const notificationPayload = {
+        title: `🚨 ${title}`,
+        body: body, // Keep concise for mobile (already limited to 200 chars)
+        icon: `${APP_ORIGIN}/public/img/icon-192.png`, // ✅ Absolute URL
+        badge: isUrgent 
+          ? `${APP_ORIGIN}/public/img/urgent-badge.png` 
+          : `${APP_ORIGIN}/public/img/badge-72.png`, // ✅ Absolute URL
+        url: `${APP_ORIGIN}/public/html/index.html`, // ✅ Absolute URL
+        urgency: isUrgent ? 'high' : 'normal',
+        data: {
+          alertType: 'admin_broadcast',
+          isUrgent: isUrgent,
+          timestamp: Date.now()
+        }
+        // ✅ NO user_ids = BROADCAST to ALL subscribers
+      };
+
+      console.log('📤 Notification payload:', notificationPayload);
+
       // ✅ TRUE BROADCAST: DO NOT include user_ids
       const response = await supabase.functions.invoke('send-push', {
-        body: {
-          title: `🚨 ${title}`,
-          body: body, // Keep concise for mobile
-          icon: '/public/img/icon-192.png',
-          badge: isUrgent ? '/public/img/urgent-badge.png' : '/public/img/badge-72.png',
-          url: '/public/html/index.html',
-          urgency: isUrgent ? 'high' : 'normal',
-          data: {
-            alertType: 'admin_broadcast',
-            isUrgent: isUrgent,
-            timestamp: Date.now()
-          }
-          // ✅ NO user_ids = BROADCAST to ALL subscribers
-        }
+        body: notificationPayload
       });
 
       console.log('📊 Broadcast response:', response);
