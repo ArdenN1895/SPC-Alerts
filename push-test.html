@@ -1,25 +1,497 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Push Test</title>
-  <script src="test-push.js"></script>
+  <title>Push Test - Fixed</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #00ff00;
+    }
+    button {
+      background: #00ff00;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      margin: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #00cc00;
+    }
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+    #results {
+      white-space: pre-wrap;
+      background: #000;
+      padding: 20px;
+      margin-top: 20px;
+      border: 2px solid #00ff00;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .error { color: #ff4444; }
+    .warning { color: #ffaa00; }
+    .success { color: #00ff00; }
+  </style>
 </head>
 <body>
-  <h1>Push Notification Tester</h1>
-  <button onclick="PushTester.runAllTests()">Run All Tests</button>
-  <button onclick="PushTester.testLocalNotification()">Test Local</button>
-  <button onclick="PushTester.testServerPush()">Test Server</button>
-  <div id="results" style="white-space: pre; font-family: monospace;"></div>
+  <h1>🔧 Push Notification Tester (Fixed)</h1>
   
+  <div>
+    <button onclick="PushTester.runAllTests()">Run All Tests</button>
+    <button onclick="PushTester.testBrowserSupport()">1. Browser Support</button>
+    <button onclick="PushTester.testPermission()">2. Permission</button>
+    <button onclick="PushTester.testServiceWorker()">3. Service Worker</button>
+    <button onclick="PushTester.testSubscription()">4. Check Subscription</button>
+    <button onclick="PushTester.testSubscribe()">5. Create Subscription</button>
+    <button onclick="PushTester.testDatabaseSave()">6. Save to DB</button>
+    <button onclick="PushTester.testLocalNotification()">7. Local Test</button>
+    <button onclick="PushTester.testServerPush()">8. Server Push</button>
+    <button onclick="clearResults()">Clear Log</button>
+  </div>
+
+  <div id="results"></div>
+
+  <!-- Load Supabase -->
+  <script type="module">
+    // Initialize Supabase
+    const supabaseUrl = 'https://oqmfjwlpuwfpbnpiavhp.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Mzg5ODE3NiwiZXhwIjoyMDc5NDc0MTc2fQ.fj7Uz0vCundy05Lw73lpRUd1yZuDYqVw4PqkXpOZ1uU';
+
+    const module = await import('https://esm.sh/@supabase/supabase-js@2');
+    const { createClient } = module;
+    window.supabase = createClient(supabaseUrl, supabaseAnonKey);
+    
+    console.log('✅ Supabase initialized');
+    window.dispatchEvent(new Event('supabase-ready'));
+  </script>
+
   <script>
     // Redirect console.log to page
     const resultsDiv = document.getElementById('results');
     const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+
     console.log = function(...args) {
       originalLog.apply(console, args);
-      resultsDiv.textContent += args.join(' ') + '\n';
+      resultsDiv.innerHTML += `<span class="success">${args.join(' ')}</span>\n`;
       resultsDiv.scrollTop = resultsDiv.scrollHeight;
     };
+
+    console.error = function(...args) {
+      originalError.apply(console, args);
+      resultsDiv.innerHTML += `<span class="error">${args.join(' ')}</span>\n`;
+      resultsDiv.scrollTop = resultsDiv.scrollHeight;
+    };
+
+    console.warn = function(...args) {
+      originalWarn.apply(console, args);
+      resultsDiv.innerHTML += `<span class="warning">${args.join(' ')}</span>\n`;
+      resultsDiv.scrollTop = resultsDiv.scrollHeight;
+    };
+
+    function clearResults() {
+      resultsDiv.innerHTML = '';
+    }
+  </script>
+
+  <script>
+    // Enhanced Push Tester with fixes
+    const PushTester = {
+      vapidKey: 'BA1RcIbho_qDHz-TEjBmAAG73hbLnI0ACtV_U0kZdT9z_Bnnx_FEEFH1ZsCb_I-IIRWIF3PClSoKe4DUKq5bPQQ',
+      currentSubscription: null,
+
+      urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+      },
+
+      async testBrowserSupport() {
+        console.log('\n🧪 TEST 1: Browser Support');
+        console.log('='.repeat(50));
+        
+        const results = {
+          serviceWorker: 'serviceWorker' in navigator,
+          pushManager: 'PushManager' in window,
+          notifications: 'Notification' in window,
+          supabase: !!window.supabase,
+          userAgent: navigator.userAgent,
+          isMobile: /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent)
+        };
+        
+        console.log('✓ Service Worker:', results.serviceWorker);
+        console.log('✓ Push Manager:', results.pushManager);
+        console.log('✓ Notifications:', results.notifications);
+        console.log('✓ Supabase:', results.supabase);
+        console.log('✓ Mobile Device:', results.isMobile);
+        
+        if (!results.serviceWorker || !results.pushManager || !results.supabase) {
+          console.error('❌ Missing required features!');
+          return false;
+        }
+        
+        console.log('✅ All features supported');
+        return true;
+      },
+
+      async testPermission() {
+        console.log('\n🧪 TEST 2: Notification Permission');
+        console.log('='.repeat(50));
+        
+        const permission = Notification.permission;
+        console.log('Current permission:', permission);
+        
+        if (permission === 'granted') {
+          console.log('✅ Notifications are allowed');
+          return true;
+        } else if (permission === 'denied') {
+          console.error('❌ Notifications blocked - reset in browser settings');
+          return false;
+        } else {
+          console.log('⚠️ Requesting permission...');
+          const result = await Notification.requestPermission();
+          console.log('Permission result:', result);
+          
+          if (result === 'granted') {
+            console.log('✅ Permission granted!');
+            return true;
+          } else {
+            console.error('❌ Permission denied');
+            return false;
+          }
+        }
+      },
+
+      async testServiceWorker() {
+        console.log('\n🧪 TEST 3: Service Worker');
+        console.log('='.repeat(50));
+        
+        try {
+          let registration = await navigator.serviceWorker.getRegistration();
+          
+          if (!registration) {
+            console.log('⚠️ Registering service worker...');
+            registration = await navigator.serviceWorker.register('/service-worker.js');
+            console.log('✅ Service worker registered');
+          } else {
+            console.log('✅ Service worker already registered');
+          }
+          
+          await navigator.serviceWorker.ready;
+          console.log('✅ Service worker ready');
+          console.log('Script URL:', registration.active?.scriptURL);
+          
+          return registration;
+        } catch (error) {
+          console.error('❌ Service worker error:', error);
+          return null;
+        }
+      },
+
+      async testSubscription() {
+        console.log('\n🧪 TEST 4: Check Subscription');
+        console.log('='.repeat(50));
+        
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.getSubscription();
+          
+          if (subscription) {
+            console.log('✅ Subscription exists');
+            console.log('Endpoint:', subscription.endpoint.substring(0, 60) + '...');
+            this.currentSubscription = subscription;
+            return subscription;
+          } else {
+            console.log('⚠️ No subscription found');
+            return null;
+          }
+        } catch (error) {
+          console.error('❌ Check failed:', error);
+          return null;
+        }
+      },
+
+      async testSubscribe() {
+        console.log('\n🧪 TEST 5: Create Subscription');
+        console.log('='.repeat(50));
+        
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          
+          // Unsubscribe existing
+          const existing = await registration.pushManager.getSubscription();
+          if (existing) {
+            console.log('Unsubscribing existing...');
+            await existing.unsubscribe();
+          }
+          
+          console.log('Creating subscription...');
+          const applicationServerKey = this.urlBase64ToUint8Array(this.vapidKey);
+          
+          const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: applicationServerKey
+          });
+          
+          console.log('✅ Subscription created!');
+          console.log('Endpoint:', subscription.endpoint.substring(0, 60) + '...');
+          
+          this.currentSubscription = subscription;
+          return subscription;
+        } catch (error) {
+          console.error('❌ Subscribe failed:', error.message);
+          return null;
+        }
+      },
+
+      async testDatabaseSave(subscription) {
+        console.log('\n🧪 TEST 6: Save to Database');
+        console.log('='.repeat(50));
+        
+        if (!window.supabase) {
+          console.error('❌ Supabase not available');
+          return false;
+        }
+
+        if (!subscription && !this.currentSubscription) {
+          console.error('❌ No subscription to save');
+          return false;
+        }
+
+        const sub = subscription || this.currentSubscription;
+        
+        try {
+          // Check authentication
+          const { data: { user }, error: authError } = await window.supabase.auth.getUser();
+          
+          if (authError || !user) {
+            console.error('❌ Not authenticated');
+            console.log('💡 Please log in to the app first, then run this test');
+            return false;
+          }
+          
+          console.log('✓ User:', user.email);
+          console.log('✓ User ID:', user.id);
+          
+          // Prepare subscription object
+          const subscriptionObject = {
+            endpoint: sub.endpoint,
+            expirationTime: sub.expirationTime,
+            keys: {
+              p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')))),
+              auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth'))))
+            }
+          };
+          
+          console.log('Saving to database...');
+          console.log('Endpoint:', subscriptionObject.endpoint.substring(0, 60) + '...');
+          
+          // Use upsert to handle duplicates
+          const { data, error } = await window.supabase
+            .from('push_subscriptions')
+            .upsert({
+              user_id: user.id,
+              subscription: subscriptionObject,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'user_id',
+              ignoreDuplicates: false
+            })
+            .select();
+          
+          if (error) {
+            console.error('❌ Database error:', error.message);
+            console.error('Error details:', error);
+            
+            // Check for common issues
+            if (error.message.includes('permission') || error.message.includes('policy')) {
+              console.log('\n💡 RLS POLICY ISSUE DETECTED!');
+              console.log('Run this SQL in Supabase SQL Editor:');
+              console.log(`
+-- Enable RLS
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to insert/update their own subscriptions
+CREATE POLICY "Users can manage own subscriptions"
+ON push_subscriptions
+FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Allow service role to read all (for broadcasting)
+CREATE POLICY "Service role can read all"
+ON push_subscriptions
+FOR SELECT
+USING (auth.role() = 'service_role');
+              `);
+            }
+            
+            return false;
+          }
+          
+          console.log('✅ Saved successfully!');
+          console.log('Database response:', data);
+          return true;
+        } catch (error) {
+          console.error('❌ Unexpected error:', error);
+          return false;
+        }
+      },
+
+      async testLocalNotification() {
+        console.log('\n🧪 TEST 7: Local Notification');
+        console.log('='.repeat(50));
+        
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          
+          await registration.showNotification('🧪 Test Notification', {
+            body: 'Local test from browser',
+            icon: '/public/img/icon-192.png',
+            badge: '/public/img/badge-72.png',
+            vibrate: [200, 100, 200],
+            tag: 'test-local',
+            requireInteraction: false
+          });
+          
+          console.log('✅ Local notification sent');
+          return true;
+        } catch (error) {
+          console.error('❌ Failed:', error);
+          return false;
+        }
+      },
+
+      async testServerPush() {
+        console.log('\n🧪 TEST 8: Server Push');
+        console.log('='.repeat(50));
+        
+        if (!window.supabase) {
+          console.error('❌ Supabase not available');
+          return false;
+        }
+        
+        try {
+          const { data: { user } } = await window.supabase.auth.getUser();
+          
+          if (!user) {
+            console.error('❌ Not authenticated');
+            return false;
+          }
+          
+          console.log('Invoking Edge Function...');
+          
+          const response = await window.supabase.functions.invoke('send-push', {
+            body: {
+              title: '🧪 Server Test',
+              body: 'Test notification from server',
+              icon: '/public/img/icon-192.png',
+              badge: '/public/img/badge-72.png',
+              url: '/public/html/index.html',
+              urgency: 'high',
+              user_ids: [user.id]
+            }
+          });
+          
+          console.log('Response:', response);
+          
+          if (response.error) {
+            console.error('❌ Server error:', response.error);
+            return false;
+          }
+          
+          if (response.data?.delivered_to > 0) {
+            console.log('✅ Server push successful!');
+            console.log('Delivered to:', response.data.delivered_to);
+            return true;
+          } else {
+            console.warn('⚠️ No deliveries confirmed');
+            console.log('Data:', response.data);
+            return false;
+          }
+        } catch (error) {
+          console.error('❌ Failed:', error);
+          return false;
+        }
+      },
+
+      async runAllTests() {
+        console.log('\n🚀 STARTING ALL TESTS');
+        console.log('='.repeat(50));
+        
+        const results = {};
+        
+        // Wait for Supabase if needed
+        if (!window.supabase) {
+          console.log('⏳ Waiting for Supabase...');
+          await new Promise(resolve => {
+            window.addEventListener('supabase-ready', resolve, { once: true });
+          });
+        }
+        
+        results.browserSupport = await this.testBrowserSupport();
+        if (!results.browserSupport) return results;
+        
+        results.permission = await this.testPermission();
+        if (!results.permission) return results;
+        
+        results.serviceWorker = await this.testServiceWorker();
+        if (!results.serviceWorker) return results;
+        
+        results.existingSubscription = await this.testSubscription();
+        
+        results.newSubscription = await this.testSubscribe();
+        if (!results.newSubscription) return results;
+        
+        results.databaseSave = await this.testDatabaseSave(results.newSubscription);
+        
+        results.localNotification = await this.testLocalNotification();
+        
+        console.log('\n⏳ Waiting 2 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        results.serverPush = await this.testServerPush();
+        
+        // Summary
+        console.log('\n📊 TEST SUMMARY');
+        console.log('='.repeat(50));
+        console.log('Browser Support:', results.browserSupport ? '✅' : '❌');
+        console.log('Permission:', results.permission ? '✅' : '❌');
+        console.log('Service Worker:', results.serviceWorker ? '✅' : '❌');
+        console.log('Existing Subscription:', results.existingSubscription ? '✅' : '⚠️');
+        console.log('New Subscription:', results.newSubscription ? '✅' : '❌');
+        console.log('Database Save:', results.databaseSave ? '✅' : '❌');
+        console.log('Local Notification:', results.localNotification ? '✅' : '❌');
+        console.log('Server Push:', results.serverPush ? '✅' : '❌');
+        
+        const allCriticalPassed = results.browserSupport && 
+                                  results.permission && 
+                                  results.serviceWorker && 
+                                  results.newSubscription && 
+                                  results.databaseSave &&
+                                  results.serverPush;
+        
+        if (allCriticalPassed) {
+          console.log('\n🎉 ALL CRITICAL TESTS PASSED!');
+        } else {
+          console.log('\n⚠️ SOME TESTS FAILED - See details above');
+        }
+        
+        return results;
+      }
+    };
+
+    window.PushTester = PushTester;
+    console.log('💡 Push Tester Ready! Click "Run All Tests" to start');
   </script>
 </body>
 </html>
