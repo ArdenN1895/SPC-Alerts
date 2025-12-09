@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Push Test</title>
+  <script src="test-push.js"></script>
+</head>
+<body>
+  <h1>Push Notification Tester</h1>
+  <button onclick="PushTester.runAllTests()">Run All Tests</button>
+  <button onclick="PushTester.testLocalNotification()">Test Local</button>
+  <button onclick="PushTester.testServerPush()">Test Server</button>
+  <div id="results" style="white-space: pre; font-family: monospace;"></div>
+  
+  <script>
+    // Redirect console.log to page
+    const resultsDiv = document.getElementById('results');
+    const originalLog = console.log;
+    console.log = function(...args) {
+      originalLog.apply(console, args);
+      resultsDiv.textContent += args.join(' ') + '\n';
+      resultsDiv.scrollTop = resultsDiv.scrollHeight;
+    };
+  </script>
+</body>
+</html>
