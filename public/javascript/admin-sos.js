@@ -208,6 +208,9 @@ function closeStatusModal() {
 }
 
 async function updateSOSStatus(supabase, sosId, newStatus) {
+  // ✅ Get the current origin for absolute URLs
+  const APP_ORIGIN = window.location.origin;
+
   try {
     // Get the SOS request details first
     const { data: sosData, error: fetchError } = await supabase
@@ -231,7 +234,7 @@ async function updateSOSStatus(supabase, sosId, newStatus) {
 
     console.log('Status updated to:', newStatus, 'for SOS:', sosId);
     
-    // Send push notification to the user
+    // ==================== SEND PUSH NOTIFICATION (MOBILE FIXED) ====================
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -241,32 +244,45 @@ async function updateSOSStatus(supabase, sosId, newStatus) {
         'arrived': 'Help has arrived at your location!'
       };
 
+      // ✅ CRITICAL FIX: Use absolute URLs for mobile compatibility
+      const notificationPayload = {
+        title: 'SOS Status Update',
+        body: statusMessages[newStatus],
+        icon: `${APP_ORIGIN}/public/img/icon-192.png`, // ✅ Absolute URL
+        badge: `${APP_ORIGIN}/public/img/badge-72.png`, // ✅ Absolute URL
+        url: `${APP_ORIGIN}/public/html/index.html`, // ✅ Absolute URL
+        urgency: 'high',
+        user_ids: [sosData.user_id] // ✅ TARGETED notification to specific user
+      };
+
+      console.log('📤 Sending SOS notification:', notificationPayload);
+
       const notificationResult = await supabase.functions.invoke('send-push', {
-        body: {
-          title: 'SOS Status Update',
-          body: statusMessages[newStatus],
-          icon: '/img/icon-192.png',
-          badge: '/img/badge-72.png',
-          url: '/public/html/index.html',
-          urgency: 'high',
-          user_ids: [sosData.user_id]
-        },
+        body: notificationPayload,
         headers: {
           Authorization: `Bearer ${session.access_token}`
         }
       });
 
-      console.log('Push notification sent:', notificationResult);
+      console.log('📊 SOS notification result:', notificationResult);
+
+      if (notificationResult.error) {
+        console.warn('⚠️ Failed to send push notification:', notificationResult.error);
+      } else if (notificationResult.data) {
+        console.log(`✅ Notification sent to user ${sosData.user_id}`);
+      }
+
     } catch (notifError) {
-      console.warn('Failed to send push notification:', notifError);
+      console.warn('⚠️ Failed to send push notification (non-critical):', notifError);
       // Don't fail the status update if notification fails
     }
 
     alert(`Status updated to: ${newStatus}`);
     closeStatusModal();
     await loadSOSRecords(supabase);
+
   } catch (err) {
-    console.error('Error updating status:', err);
+    console.error('❌ Error updating status:', err);
     alert('Failed to update status: ' + err.message);
   }
 }
