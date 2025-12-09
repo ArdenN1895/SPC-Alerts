@@ -81,7 +81,7 @@ const PushTester = {
       
       if (!registration) {
         console.log('⚠️ Service worker not registered, registering now...');
-        registration = await navigator.serviceWorker.register('/sw.js');
+        registration = await navigator.serviceWorker.register('/service-worker.js');
         console.log('✅ Service worker registered');
       } else {
         console.log('✅ Service worker already registered');
