@@ -1,4 +1,4 @@
-// admin-sos.js - SOS Management for Admin
+// admin-sos.js - SOS Management for Admin (No Targeted Notifications)
 let currentSOSRecords = [];
 window.sosAddressCache = new Map();
 
@@ -208,20 +208,8 @@ function closeStatusModal() {
 }
 
 async function updateSOSStatus(supabase, sosId, newStatus) {
-  // ✅ Get the current origin for absolute URLs
-  const APP_ORIGIN = window.location.origin;
-
   try {
-    // Get the SOS request details first
-    const { data: sosData, error: fetchError } = await supabase
-      .from('sos_requests')
-      .select('user_id')
-      .eq('id', sosId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    // Update the status
+    // Update the status (no need to fetch user_id since we're not sending notifications)
     const { error } = await supabase
       .from('sos_requests')
       .update({ 
@@ -232,57 +220,15 @@ async function updateSOSStatus(supabase, sosId, newStatus) {
 
     if (error) throw error;
 
-    console.log('Status updated to:', newStatus, 'for SOS:', sosId);
+    console.log('✅ Status updated to:', newStatus, 'for SOS:', sosId);
     
-    // ==================== SEND PUSH NOTIFICATION (MOBILE FIXED) ====================
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const statusMessages = {
-        'waiting': 'Your emergency request is being processed',
-        'dispatched': 'Emergency responders are on the way!',
-        'arrived': 'Help has arrived at your location!'
-      };
-
-      // ✅ CRITICAL FIX: Use absolute URLs for mobile compatibility
-      const notificationPayload = {
-        title: 'SOS Status Update',
-        body: statusMessages[newStatus],
-        icon: `${APP_ORIGIN}/public/img/icon-192.png`, // ✅ Absolute URL
-        badge: `${APP_ORIGIN}/public/img/badge-72.png`, // ✅ Absolute URL
-        url: `${APP_ORIGIN}/public/html/index.html`, // ✅ Absolute URL
-        urgency: 'high',
-        user_ids: [sosData.user_id] // ✅ TARGETED notification to specific user
-      };
-
-      console.log('📤 Sending SOS notification:', notificationPayload);
-
-      const notificationResult = await supabase.functions.invoke('send-push', {
-        body: notificationPayload,
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
-
-      console.log('📊 SOS notification result:', notificationResult);
-
-      if (notificationResult.error) {
-        console.warn('⚠️ Failed to send push notification:', notificationResult.error);
-      } else if (notificationResult.data) {
-        console.log(`✅ Notification sent to user ${sosData.user_id}`);
-      }
-
-    } catch (notifError) {
-      console.warn('⚠️ Failed to send push notification (non-critical):', notifError);
-      // Don't fail the status update if notification fails
-    }
-
+    // ✅ REMOVED: No push notification sent to the user
+    
     alert(`Status updated to: ${newStatus}`);
     closeStatusModal();
     await loadSOSRecords(supabase);
-
   } catch (err) {
-    console.error('❌ Error updating status:', err);
+    console.error('Error updating status:', err);
     alert('Failed to update status: ' + err.message);
   }
 }
@@ -326,7 +272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const isAdmin = session?.user?.id && (stored?.is_admin === true || stored?.id === 'admin-001');
 
   if (!isAdmin) {
-    alert('Access denied – Admin rights required');
+    alert('Access denied — Admin rights required');
     window.location.href = '/public/html/login.html';
     return;
   }
