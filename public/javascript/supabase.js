@@ -1,6 +1,6 @@
 // javascript/supabase.js - FIXED & SAFE VERSION (2025)
 const supabaseUrl = 'https://oqmfjwlpuwfpbnpiavhp.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Mzg5ODE3NiwiZXhwIjoyMDc5NDc0MTc2fQ.fj7Uz0vCundy05Lw73lpRUd1yZuDYqVw4PqkXpOZ1uU';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbWZqd2xwdXdmcGJucGlhdmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4OTgxNzYsImV4cCI6MjA3OTQ3NDE3Nn0.yywiH3q3g1Rbyypt5mxvhRgDXZrSFENZn5s1EWVp8Z8';
 
 import('https://esm.sh/@supabase/supabase-js@2').then(module => {
   const { createClient } = module;
