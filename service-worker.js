@@ -1,8 +1,5 @@
-// sw.js - Service Worker with Mobile Push Notification Support
-const CACHE_NAME = 'spc-alerts-v12';
-
-// Get the origin dynamically
-const APP_ORIGIN = self.location.origin;
+// service-worker.js - FIXED VERSION for Mobile Push Notifications
+const CACHE_NAME = 'spc-alerts-v13';
 
 const urlsToCache = [
   '/public/html/index.html',
@@ -30,13 +27,12 @@ const urlsToCache = [
 
 // ==================== INSTALL EVENT ====================
 self.addEventListener('install', event => {
-  console.log('🔧 [SW] Installing Service Worker...');
+  console.log('🔧 [SW] Installing Service Worker v13...');
   
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('📦 [SW] Opened cache:', CACHE_NAME);
-        
         return Promise.allSettled(
           urlsToCache.map(url => 
             cache.add(url)
@@ -46,12 +42,10 @@ self.addEventListener('install', event => {
         );
       })
       .then(() => {
-        console.log('✅ [SW] Service Worker installed successfully');
+        console.log('✅ [SW] Service Worker installed');
         return self.skipWaiting();
       })
-      .catch(err => {
-        console.error('❌ [SW] Install failed:', err);
-      })
+      .catch(err => console.error('❌ [SW] Install failed:', err))
   );
 });
 
@@ -74,8 +68,6 @@ self.addEventListener('activate', event => {
       self.clients.claim()
     ]).then(() => {
       console.log('✅ [SW] Service Worker activated and controlling all clients');
-    }).catch(err => {
-      console.error('❌ [SW] Activation failed:', err);
     })
   );
 });
@@ -128,206 +120,184 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ==================== PUSH EVENT (FIXED FOR MOBILE) ====================
+// ==================== PUSH EVENT (CRITICAL - SIMPLIFIED FOR MOBILE) ====================
 self.addEventListener('push', event => {
-  console.log('🔔 [SW] Push notification received at:', new Date().toISOString());
-  console.log('🌐 [SW] Origin:', APP_ORIGIN);
+  console.log('🔔 [SW] Push notification received:', new Date().toISOString());
   
-  // ✅ FIX: Use absolute URLs for all resources
-  let notificationData = { 
-    title: 'SPC Alerts', 
-    body: 'You have a new alert',
-    icon: `${APP_ORIGIN}/public/img/icon-192.png`,
-    badge: `${APP_ORIGIN}/public/img/badge-72.png`,
+  // ✅ DEFAULT PAYLOAD (fallback)
+  let notification = {
+    title: 'SPC Alerts',
+    body: 'You have a new emergency alert',
+    icon: '/public/img/icon-192.png',
+    badge: '/public/img/badge-72.png',
+    url: '/public/html/index.html',
     data: {}
   };
   
-  // Parse push payload
+  // ✅ PARSE PUSH DATA (synchronously, no await)
   if (event.data) {
     try {
       const payload = event.data.json();
-      console.log('📦 [SW] Parsed push data:', payload);
+      console.log('📦 [SW] Parsed payload:', payload);
       
-      // ✅ FIX: Ensure all URLs are absolute
-      notificationData = {
-        title: payload.title || notificationData.title,
-        body: payload.body || notificationData.body,
-        icon: makeAbsoluteUrl(payload.icon || notificationData.icon),
-        badge: makeAbsoluteUrl(payload.badge || notificationData.badge),
-        image: payload.image ? makeAbsoluteUrl(payload.image) : undefined,
-        data: payload.data || {},
-        url: makeAbsoluteUrl(payload.url || '/public/html/index.html')
+      // Merge with defaults
+      notification = {
+        title: payload.title || notification.title,
+        body: payload.body || notification.body,
+        icon: payload.icon || notification.icon,
+        badge: payload.badge || notification.badge,
+        image: payload.image,
+        url: payload.url || payload.data?.url || notification.url,
+        data: payload.data || {}
       };
-      
-    } catch (parseError) {
-      console.warn('⚠️ [SW] Failed to parse push data:', parseError);
-      notificationData.body = event.data.text();
+    } catch (e) {
+      console.warn('⚠️ [SW] JSON parse failed, using text:', e.message);
+      notification.body = event.data.text();
     }
   }
-
-  // ✅ FIX: Mobile-optimized notification options
-  const notificationOptions = {
-    body: notificationData.body,
-    icon: notificationData.icon,
-    badge: notificationData.badge,
-    image: notificationData.image,
+  
+  // ✅ NOTIFICATION OPTIONS (optimized for mobile)
+  const options = {
+    body: notification.body,
+    icon: notification.icon,
+    badge: notification.badge,
+    image: notification.image,
     
-    // ✅ CRITICAL: Changed requireInteraction to false for better mobile compatibility
-    requireInteraction: false, // Mobile browsers handle this differently
-    silent: false,
-    renotify: true,
+    // Mobile-critical settings
+    requireInteraction: true,  // Keep visible until user acts
+    vibrate: [200, 100, 200],  // Vibration pattern
+    silent: false,              // Play sound
+    renotify: true,             // Re-alert on update
     
-    // ✅ Vibration pattern (works on Android)
-    vibrate: [200, 100, 200],
-    
-    // Data payload
+    // Data and actions
     data: {
-      url: notificationData.url,
+      url: notification.url,
       timestamp: Date.now(),
-      ...notificationData.data
+      ...notification.data
     },
+    tag: `spc-${Date.now()}`,   // Unique tag
     
-    // Unique tag
-    tag: `spc-alert-${Date.now()}`,
-    
-    // ✅ Simplified actions for better mobile support
+    // Action buttons (mobile-compatible)
     actions: [
-      { 
-        action: 'open', 
-        title: '👁️ View'
-      },
-      { 
-        action: 'close', 
-        title: '✕ Dismiss' 
-      }
+      { action: 'open', title: '👁️ View' },
+      { action: 'close', title: '✕ Dismiss' }
     ]
   };
-
-  console.log('📤 [SW] Showing notification with options:', notificationOptions);
-
-  // ✅ CRITICAL: Always show notification
+  
+  // ✅ SHOW NOTIFICATION IMMEDIATELY (critical for mobile)
   event.waitUntil(
-    self.registration.showNotification(
-      notificationData.title, 
-      notificationOptions
-    )
-    .then(() => {
-      console.log('✅ [SW] Notification displayed successfully');
-      
-      return self.clients.matchAll({ 
-        includeUncontrolled: true, 
-        type: 'window' 
-      });
-    })
-    .then(clients => {
-      console.log(`📢 [SW] Notifying ${clients.length} open client(s)`);
-      
-      clients.forEach(client => {
-        client.postMessage({
-          type: 'PUSH_RECEIVED',
-          data: notificationData,
-          timestamp: Date.now()
+    self.registration.showNotification(notification.title, options)
+      .then(() => {
+        console.log('✅ [SW] Notification displayed successfully');
+        
+        // Notify open clients
+        return self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+      })
+      .then(clients => {
+        console.log(`📢 [SW] Notifying ${clients.length} open client(s)`);
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'PUSH_RECEIVED',
+            data: notification,
+            timestamp: Date.now()
+          });
         });
-      });
-    })
-    .catch(err => {
-      console.error('❌ [SW] Failed to show notification:', err);
-      console.error('Error details:', {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      });
-      
-      // Fallback notification with minimal options
-      return self.registration.showNotification('SPC Alerts', {
-        body: 'New alert received',
-        icon: `${APP_ORIGIN}/public/img/icon-192.png`,
-        badge: `${APP_ORIGIN}/public/img/badge-72.png`,
-        tag: 'fallback-notification',
-        requireInteraction: false
-      });
-    })
+      })
+      .catch(err => {
+        console.error('❌ [SW] Notification failed:', err);
+        
+        // ✅ FALLBACK: Show basic notification
+        return self.registration.showNotification('SPC Emergency Alert', {
+          body: 'New alert received - tap to view',
+          icon: '/public/img/icon-192.png',
+          badge: '/public/img/badge-72.png',
+          tag: 'fallback',
+          requireInteraction: true
+        }).catch(fallbackErr => {
+          console.error('❌ [SW] Fallback notification also failed:', fallbackErr);
+        });
+      })
   );
 });
 
 // ==================== NOTIFICATION CLICK EVENT ====================
 self.addEventListener('notificationclick', event => {
   console.log('🖱️ [SW] Notification clicked');
-  console.log('Action:', event.action);
   
   event.notification.close();
 
+  // Handle dismiss action
   if (event.action === 'close') {
     console.log('🚪 [SW] User dismissed notification');
     return;
   }
 
-  const urlToOpen = event.notification.data?.url || `${APP_ORIGIN}/public/html/index.html`;
+  const urlToOpen = event.notification.data?.url || '/public/html/index.html';
   console.log('🔗 [SW] Opening URL:', urlToOpen);
 
   event.waitUntil(
-    clients.matchAll({ 
-      type: 'window', 
-      includeUncontrolled: true 
-    })
-    .then(clientList => {
-      console.log(`🔍 [SW] Found ${clientList.length} open window(s)`);
-      
-      // Try to focus an existing window
-      for (const client of clientList) {
-        try {
-          const clientUrl = new URL(client.url);
-          const targetUrl = new URL(urlToOpen);
-          
-          if (clientUrl.pathname === targetUrl.pathname && 'focus' in client) {
-            console.log('✅ [SW] Focusing existing window');
-            return client.focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(clientList => {
+        // Try to focus existing window with same path
+        const targetUrl = new URL(urlToOpen, self.location.origin);
+        
+        for (const client of clientList) {
+          try {
+            const clientUrl = new URL(client.url);
+            if (clientUrl.pathname === targetUrl.pathname && 'focus' in client) {
+              console.log('✅ [SW] Focusing existing window');
+              return client.focus();
+            }
+          } catch (e) {
+            console.warn('⚠️ [SW] Failed to parse client URL:', e);
           }
-        } catch (e) {
-          console.warn('⚠️ [SW] Error comparing URLs:', e);
         }
-      }
-      
-      // Navigate first window or open new one
-      if (clientList.length > 0 && clientList[0].url !== 'about:blank') {
-        console.log('🔄 [SW] Navigating first window');
-        return clientList[0].focus().then(() => {
-          if ('navigate' in clientList[0]) {
-            return clientList[0].navigate(urlToOpen);
-          }
-        }).catch(() => {
-          return clients.openWindow(urlToOpen);
-        });
-      }
-      
-      // Open new window
-      console.log('🆕 [SW] Opening new window');
-      return clients.openWindow(urlToOpen);
-    })
-    .catch(err => {
-      console.error('❌ [SW] Failed to handle notification click:', err);
-      if (clients.openWindow) {
+        
+        // Focus first available window and navigate
+        if (clientList.length > 0) {
+          const client = clientList[0];
+          console.log('🔄 [SW] Navigating existing window');
+          
+          return client.focus().then(() => {
+            if ('navigate' in client) {
+              return client.navigate(urlToOpen);
+            }
+            return client;
+          }).catch(() => {
+            // Navigate failed, open new window
+            return clients.openWindow(urlToOpen);
+          });
+        }
+        
+        // No windows open, create new one
+        console.log('🆕 [SW] Opening new window');
         return clients.openWindow(urlToOpen);
-      }
-    })
+      })
+      .catch(err => {
+        console.error('❌ [SW] Click handler failed:', err);
+        // Final fallback
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
   );
 });
 
 // ==================== NOTIFICATION CLOSE EVENT ====================
 self.addEventListener('notificationclose', event => {
-  console.log('🚪 [SW] Notification closed:', event.notification.tag);
+  console.log('🚪 [SW] Notification closed without action:', event.notification.tag);
 });
 
-// ==================== PUSH SUBSCRIPTION CHANGE EVENT ====================
+// ==================== PUSH SUBSCRIPTION CHANGE ====================
 self.addEventListener('pushsubscriptionchange', event => {
   console.log('🔄 [SW] Push subscription changed/expired');
+  
+  const vapidKey = 'BA1RcIbho_qDHz-TEjBmAAG73hbLnI0ACtV_U0kZdT9z_Bnnx_FEEFH1ZsCb_I-IIRWIF3PClSoKe4DUKq5bPQQ';
   
   event.waitUntil(
     self.registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(
-        'BA1RcIbho_qDHz-TEjBmAAG73hbLnI0ACtV_U0kZdT9z_Bnnx_FEEFH1ZsCb_I-IIRWIF3PClSoKe4DUKq5bPQQ'
-      )
+      applicationServerKey: urlBase64ToUint8Array(vapidKey)
     })
     .then(newSubscription => {
       console.log('✅ [SW] Push subscription renewed');
@@ -342,14 +312,14 @@ self.addEventListener('pushsubscriptionchange', event => {
       });
     })
     .catch(err => {
-      console.error('❌ [SW] Failed to renew push subscription:', err);
+      console.error('❌ [SW] Failed to renew subscription:', err);
     })
   );
 });
 
 // ==================== MESSAGE EVENT ====================
 self.addEventListener('message', event => {
-  console.log('💬 [SW] Message received from client:', event.data);
+  console.log('💬 [SW] Message from client:', event.data?.type);
   
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
@@ -360,30 +330,11 @@ self.addEventListener('message', event => {
   }
   
   if (event.data?.type === 'KEEP_ALIVE') {
-    event.ports[0]?.postMessage({ 
-      type: 'ALIVE', 
-      timestamp: Date.now() 
-    });
+    event.ports[0]?.postMessage({ type: 'ALIVE', timestamp: Date.now() });
   }
   
   if (event.data?.type === 'GET_VERSION') {
-    event.ports[0]?.postMessage({ 
-      type: 'VERSION', 
-      version: CACHE_NAME 
-    });
-  }
-});
-
-// ==================== BACKGROUND SYNC ====================
-self.addEventListener('sync', event => {
-  console.log('🔄 [SW] Background sync:', event.tag);
-  
-  if (event.tag === 'keep-alive') {
-    event.waitUntil(
-      fetch('/public/img/icon-192.png', { cache: 'reload' })
-        .then(() => console.log('✅ [SW] Keep-alive ping successful'))
-        .catch(err => console.warn('⚠️ [SW] Keep-alive ping failed:', err))
-    );
+    event.ports[0]?.postMessage({ type: 'VERSION', version: CACHE_NAME });
   }
 });
 
@@ -399,23 +350,5 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
-// ✅ NEW: Helper to ensure URLs are absolute
-function makeAbsoluteUrl(url) {
-  if (!url) return null;
-  
-  // Already absolute
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-  
-  // Make absolute using origin
-  if (url.startsWith('/')) {
-    return `${APP_ORIGIN}${url}`;
-  }
-  
-  return `${APP_ORIGIN}/${url}`;
-}
-
-console.log('✅ [SW] Service Worker script loaded successfully');
-console.log('📋 [SW] Cache version:', CACHE_NAME);
-console.log('🌐 [SW] Origin:', APP_ORIGIN);
+console.log('✅ [SW] Service Worker script loaded - v13');
+console.log('🌐 [SW] Origin:', self.location.origin);
