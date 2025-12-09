@@ -384,7 +384,8 @@ function setupRealtime(table, callback) {
 }
 
 
-// FIXED: setupQuickActions function in admin.js
+// admin.js - setupQuickActions function (BROADCAST ALERT - MOBILE COMPATIBLE)
+
 function setupQuickActions(supabase, session) {
   const alertModal = document.getElementById('alertModal');
   const alertForm = document.getElementById('alertForm');
@@ -397,11 +398,13 @@ function setupQuickActions(supabase, session) {
   const alertStatus = document.getElementById('alertStatus');
   const sendAlertBtn = document.getElementById('sendAlertBtn');
 
+  // Open modal
   document.querySelector('.action-btn:nth-child(1)')?.addEventListener('click', () => {
     alertModal.classList.add('show');
     alertTitle.focus();
   });
 
+  // Close modal functions
   const closeModal = () => {
     alertModal.classList.remove('show');
     alertStatus.style.display = 'none';
@@ -418,6 +421,7 @@ function setupQuickActions(supabase, session) {
     if (e.key === 'Escape' && alertModal.classList.contains('show')) closeModal();
   });
 
+  // Preview update
   const updatePreview = () => {
     previewTitle.textContent = alertTitle.value.trim() || 'Emergency Alert';
     previewMessage.textContent = alertMessage.value.trim() || 'Please stay safe and follow official instructions.';
@@ -429,6 +433,7 @@ function setupQuickActions(supabase, session) {
   alertTitle.addEventListener('input', updatePreview);
   alertMessage.addEventListener('input', updatePreview);
 
+  // ==================== BROADCAST ALERT SUBMISSION ====================
   alertForm.onsubmit = async (e) => {
     e.preventDefault();
 
@@ -442,61 +447,57 @@ function setupQuickActions(supabase, session) {
     }
 
     sendAlertBtn.disabled = true;
-    sendAlertBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-    showStatus('Preparing to send broadcast alert...', 'loading');
+    sendAlertBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Broadcasting...';
+    showStatus('Preparing broadcast alert...', 'loading');
 
     try {
-      // 💡 FIX: Removed database queries for push_subscriptions.
-      // We are forcing a broadcast by NOT providing the 'user_ids' property.
-      
-      console.log(`📢 Initiating BROADCAST alert: ${title}`);
+      console.log('📢 Starting broadcast alert to ALL users...');
 
-      showStatus(`Sending alert to all subscribed users...`, 'loading');
-
-      // Step 1: Get fresh session (good practice)
-      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !currentSession?.access_token) {
-        throw new Error('Authentication failed. Please log in again.');
-      }
-
-      // Step 2: Call Edge Function without user_ids array
+      // ✅ TRUE BROADCAST: DO NOT include user_ids
       const response = await supabase.functions.invoke('send-push', {
         body: {
           title: `🚨 ${title}`,
-          body: body,
+          body: body, // Keep concise for mobile
           icon: '/public/img/icon-192.png',
           badge: isUrgent ? '/public/img/urgent-badge.png' : '/public/img/badge-72.png',
           url: '/public/html/index.html',
           urgency: isUrgent ? 'high' : 'normal',
-          // REMOVED: user_ids: userIds <-- Absence triggers broadcast in index.ts
+          data: {
+            alertType: 'admin_broadcast',
+            isUrgent: isUrgent,
+            timestamp: Date.now()
+          }
+          // ✅ NO user_ids = BROADCAST to ALL subscribers
         }
       });
 
-      console.log('Response:', response);
+      console.log('📊 Broadcast response:', response);
 
       if (response.error) {
-        throw new Error(response.error.message || 'Push notification failed');
+        throw new Error(response.error.message || 'Broadcast failed');
       }
 
       const result = response.data;
 
-      if (result.delivered_to > 0) {
+      if (result && result.delivered_to > 0) {
         showStatus(
-          `✅ Broadcast Alert sent successfully!\n\nDelivered: ${result.delivered_to} users\nFailed: ${result.failed || 0}`,
+          `✅ Alert broadcast successfully!\n\nDelivered to: ${result.delivered_to} user(s)\nFailed: ${result.failed || 0}`,
           'success'
         );
+        console.log(`✅ Broadcast delivered to ${result.delivered_to} user(s)`);
         setTimeout(() => closeModal(), 3000);
-      } else {
+      } else if (result && result.delivered_to === 0) {
         showStatus(
-          `⚠️ Alert sent but no users received it.\nTotal Subscriptions: ${result.total_subscriptions}\nFailed: ${result.failed || 0}`,
+          '⚠️ Alert prepared but no active subscribers found.\nUsers may not have notifications enabled.',
           'warning'
         );
+      } else {
+        throw new Error('Unexpected response from broadcast service');
       }
 
     } catch (err) {
-      console.error('❌ Alert error:', err);
-      showStatus('Failed to send alert: ' + err.message, 'error');
+      console.error('❌ Broadcast error:', err);
+      showStatus('Failed to broadcast alert: ' + err.message, 'error');
     } finally {
       sendAlertBtn.disabled = false;
       sendAlertBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Alert';
@@ -509,7 +510,7 @@ function setupQuickActions(supabase, session) {
     alertStatus.style.display = 'block';
   }
 
-  // Generate Report button
+  // Generate Report button (existing code)
   document.querySelector('.action-btn:nth-child(2)')?.addEventListener('click', async () => {
     const { data } = await supabase.from('incidents').select('*').order('created_at', { ascending: false });
     if (!data?.length) return alert('No incidents to export');
