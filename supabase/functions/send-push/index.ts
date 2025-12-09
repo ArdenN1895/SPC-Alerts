@@ -1,5 +1,5 @@
 // supabase/functions/send-push/index.ts
-// FIXED VERSION: Enhanced logging, error handling, and mobile compatibility
+// FIXED VERSION: Enhanced mobile compatibility
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -11,11 +11,27 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
-// Helper to log with timestamps
 function log(message: string, data?: any) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${message}`);
   if (data) console.log(JSON.stringify(data, null, 2));
+}
+
+// ✅ Helper to construct absolute URLs
+function makeAbsoluteUrl(url: string | undefined, origin: string): string | undefined {
+  if (!url) return undefined;
+  
+  // Already absolute
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  // Make absolute
+  if (url.startsWith('/')) {
+    return `${origin}${url}`;
+  }
+  
+  return `${origin}/${url}`;
 }
 
 serve(async (req) => {
@@ -40,7 +56,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    // Detailed environment check
     log("🔍 Environment Check:", {
       vapidPublic: vapidPublic ? `${vapidPublic.substring(0, 20)}...` : "MISSING",
       vapidPrivate: vapidPrivate ? "SET" : "MISSING",
@@ -171,37 +186,63 @@ serve(async (req) => {
       );
     }
 
-    // Get the origin from request or use default
-    const origin = req.headers.get('origin') || 'https://spc-alerts.vercel.app';
+    // ✅ FIX: Get origin from request or use production URL
+    const requestOrigin = req.headers.get('origin') || req.headers.get('referer');
+    let origin = 'https://spc-alerts.vercel.app'; // Default production URL
     
-    // Prepare notification payload with absolute URLs
+    if (requestOrigin) {
+      try {
+        const originUrl = new URL(requestOrigin);
+        origin = originUrl.origin;
+        log("🌐 Using origin from request:", origin);
+      } catch (e) {
+        log("⚠️ Failed to parse origin, using default:", origin);
+      }
+    }
+    
+    // ✅ FIX: Prepare notification payload with proper absolute URLs
     const notificationPayload = JSON.stringify({ 
       title, 
       body, 
-      icon: icon || `${origin}/public/img/icon-192.png`,
-      badge: badge || `${origin}/public/img/badge-72.png`,
-      image: image ? (image.startsWith('http') ? image : `${origin}${image}`) : undefined,
-      url: url || `${origin}/public/html/index.html`,
+      icon: makeAbsoluteUrl(icon, origin) || `${origin}/public/img/icon-192.png`,
+      badge: makeAbsoluteUrl(badge, origin) || `${origin}/public/img/badge-72.png`,
+      image: makeAbsoluteUrl(image, origin),
+      url: makeAbsoluteUrl(url, origin) || `${origin}/public/html/index.html`,
       data: {
         ...(data || {}),
         timestamp: Date.now(),
         notificationType: isTargeted ? 'targeted' : 'broadcast'
       },
       tag: `spc-alert-${Date.now()}`,
-      requireInteraction: urgency === 'high',
-      // Mobile-specific options
+      // ✅ CRITICAL: Mobile-friendly options
+      requireInteraction: false, // Changed from urgency === 'high'
       vibrate: [200, 100, 200],
       silent: false,
       renotify: true
     });
 
-    log("📤 Notification payload prepared:", JSON.parse(notificationPayload));
+    log("📤 Notification payload prepared");
+    log("📋 Payload preview:", {
+      title,
+      body,
+      icon: JSON.parse(notificationPayload).icon,
+      badge: JSON.parse(notificationPayload).badge,
+      dataSize: notificationPayload.length
+    });
+
+    // ✅ Check payload size (mobile limit is ~4KB)
+    const payloadSizeKB = (notificationPayload.length / 1024).toFixed(2);
+    log(`📏 Payload size: ${payloadSizeKB} KB`);
+    
+    if (notificationPayload.length > 4000) {
+      log("⚠️ WARNING: Payload exceeds 4KB, may fail on some mobile devices");
+    }
 
     let delivered = 0;
     let failed = 0;
     const errors: Array<{id: string, user_id: string, error: string, statusCode?: number}> = [];
 
-    // Send notifications concurrently
+    // Send notifications
     log(`🚀 Sending to ${subscriptions.length} subscription(s)...`);
     
     const sendPromises = subscriptions.map(({ id, user_id, subscription }) => (async () => {
@@ -211,26 +252,35 @@ serve(async (req) => {
           ? JSON.parse(subscription) 
           : subscription;
         
-        log(`📤 Sending to user ${user_id} (subscription ${id})`);
-        
-        // Validate subscription structure
-        if (!sub.endpoint || !sub.keys?.p256dh || !sub.keys?.auth) {
-          throw new Error("Invalid subscription structure");
+        // ✅ Validate subscription structure
+        if (!sub.endpoint) {
+          throw new Error("Missing endpoint in subscription");
         }
+        if (!sub.keys?.p256dh || !sub.keys?.auth) {
+          throw new Error("Missing encryption keys in subscription");
+        }
+        
+        log(`📤 Sending to user ${user_id} (subscription ${id})`);
+        log(`🔗 Endpoint: ${sub.endpoint.substring(0, 50)}...`);
+        
+        // ✅ FIX: Proper options for mobile
+        const sendOptions = {
+          TTL: 86400, // 24 hours
+          urgency: urgency as "very-low" | "low" | "normal" | "high",
+          contentEncoding: "aes128gcm" as const,
+          // ✅ Add headers for better mobile delivery
+          headers: {}
+        };
         
         // Send the notification
         const result = await webpush.sendNotification(
           sub,
           notificationPayload,
-          {
-            TTL: 86400, // 24 hours
-            urgency: urgency,
-            contentEncoding: "aes128gcm"
-          }
+          sendOptions
         );
         
         delivered++;
-        log(`✅ Delivered to user ${user_id}`);
+        log(`✅ Delivered to user ${user_id} - Status: ${result.statusCode}`);
 
       } catch (error: any) {
         failed++;
@@ -250,8 +300,8 @@ serve(async (req) => {
           statusCode
         });
 
-        // Remove invalid/expired subscriptions
-        if (statusCode === 410 || statusCode === 404) {
+        // ✅ Clean up invalid/expired subscriptions
+        if (statusCode === 410 || statusCode === 404 || statusCode === 403) {
           log(`🗑️ Removing invalid subscription ${id} for user ${user_id}`);
           try {
             await supabase.from("push_subscriptions").delete().eq("id", id);
@@ -272,7 +322,8 @@ serve(async (req) => {
       delivered,
       failed,
       totalSubscriptions: subscriptions.length,
-      successRate: `${((delivered / subscriptions.length) * 100).toFixed(1)}%`
+      successRate: `${((delivered / subscriptions.length) * 100).toFixed(1)}%`,
+      payloadSize: `${payloadSizeKB} KB`
     });
 
     if (errors.length > 0) {
@@ -281,13 +332,14 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ 
-        success: true,
+        success: delivered > 0,
         delivered_to: delivered,
         failed,
         total_subscriptions: subscriptions.length,
         notification_type: isTargeted ? 'targeted' : 'broadcast',
         targeted_users: user_ids || null,
         errors: errors.length > 0 ? errors : undefined,
+        payload_size_kb: parseFloat(payloadSizeKB),
         timestamp: new Date().toISOString()
       }), 
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
