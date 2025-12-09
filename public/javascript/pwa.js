@@ -38,10 +38,3 @@ window.subscribeToPush = async () => {
     console.log('Push init failed:', err);
   }
 };
-
-// Call this after user logs in (add to login.js or index.js)
-window.addEventListener('supabase-ready', () => {
-  setTimeout(() => {
-    window.subscribeToPush?.();
-  }, 4000);
-});
