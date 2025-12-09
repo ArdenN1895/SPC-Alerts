@@ -237,5 +237,10 @@ if ('serviceWorker' in navigator) {
 
   <script src="../javascript/admin.js" defer></script>
   <script src="../javascript/keep-alive.js" type="module"></script>
+  <script type="module">
+  import { initPushNotifications } from '../javascript/push.js';
+  window.addEventListener('supabase-ready', () => {
+    setTimeout(initPushNotifications, 3000); // after login
+  });
 </body>
 </html>
