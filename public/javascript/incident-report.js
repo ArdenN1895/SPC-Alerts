@@ -1,4 +1,4 @@
-// incident-report.js - FIXED FOR MOBILE PUSH NOTIFICATIONS
+// incident-report.js - TRUE BROADCAST VERSION (Mobile Compatible)
 
 document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('incidentForm');
@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
   };
 
-  // ==================== FORM SUBMISSION (FIXED FOR MOBILE) ====================
+  // ==================== FORM SUBMISSION (TRUE BROADCAST) ====================
   form.onsubmit = async e => {
     e.preventDefault();
     
@@ -138,71 +138,67 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       console.log('✅ Incident saved to database:', insertedIncident.id);
 
-      // ✅ FIX: Send push notifications with proper mobile-compatible format
-      showStatus('Notifying users...', 'loading');
+      // ==================== BROADCAST PUSH NOTIFICATION ====================
+      showStatus('Broadcasting to all users...', 'loading');
 
       try {
-        // Get ALL subscribed users
-        const { data: subscribers, error: subError } = await supabase
-          .from('push_subscriptions')
-          .select('user_id');
+        // Format location for notification
+        let locationText = 'San Pablo City';
+        if (currentPosition) {
+          locationText = `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`;
+        } else if (locationInput.value.trim()) {
+          locationText = locationInput.value.trim().substring(0, 30);
+        }
 
-        if (subError) {
-          console.warn('⚠️ Could not fetch subscribers:', subError);
-        } else if (subscribers && subscribers.length > 0) {
-          const userIds = [...new Set(subscribers.map(s => s.user_id))];
-          console.log(`📢 Notifying ${userIds.length} subscribed user(s)`);
+        // Mobile-friendly notification body (short and concise)
+        const notificationBody = `${incidentType} in ${locationText}`;
 
-          // Format location for notification
-          let locationText = 'San Pablo City';
-          if (currentPosition) {
-            locationText = `${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`;
-          } else if (locationInput.value.trim()) {
-            locationText = locationInput.value.trim().substring(0, 30);
-          }
-
-          // ✅ MOBILE-COMPATIBLE: Shorter body text, proper urgency
-          const notificationBody = `${incidentType} in ${locationText}`;
-
-          // ✅ Send with correct format for mobile
-          const notificationResult = await supabase.functions.invoke('send-push', {
-            body: {
-              title: '🚨 New Incident Report',
-              body: notificationBody,
-              icon: '/public/img/icon-192.png',
-              badge: '/public/img/badge-72.png',
-              image: photoUrl || undefined,
-              url: '/public/html/index.html',
-              urgency: 'high', // ✅ Important for mobile priority
-              data: {
-                incidentId: insertedIncident.id,
-                incidentType: incidentType,
-                location: currentPosition || locationInput.value.trim(),
-                timestamp: Date.now()
-              },
-              user_ids: userIds // ✅ CRITICAL: Must include for targeted delivery
+        // ✅ TRUE BROADCAST: DO NOT include user_ids
+        const notificationResult = await supabase.functions.invoke('send-push', {
+          body: {
+            title: '🚨 New Incident Report',
+            body: notificationBody,
+            icon: '/public/img/icon-192.png',
+            badge: '/public/img/badge-72.png',
+            image: photoUrl || undefined,
+            url: '/public/html/index.html',
+            urgency: 'high', // High priority for mobile
+            data: {
+              incidentId: insertedIncident.id,
+              incidentType: incidentType,
+              location: currentPosition || locationInput.value.trim(),
+              timestamp: Date.now()
             }
-          });
-
-          console.log('📊 Push notification result:', notificationResult);
-
-          if (notificationResult.error) {
-            console.error('❌ Push failed:', notificationResult.error);
-          } else if (notificationResult.data?.delivered_to > 0) {
-            console.log(`✅ Notifications sent to ${notificationResult.data.delivered_to} user(s)`);
-          } else {
-            console.warn('⚠️ No users received notifications');
+            // ✅ NO user_ids = BROADCAST to ALL subscribers
           }
-        } else {
-          console.log('🔭 No subscribers to notify');
+        });
+
+        console.log('📊 Broadcast result:', notificationResult);
+
+        if (notificationResult.error) {
+          console.error('❌ Broadcast failed:', notificationResult.error);
+          showStatus('⚠️ Report saved but notification failed', 'warning');
+        } else if (notificationResult.data) {
+          const result = notificationResult.data;
+          console.log(`✅ Broadcast sent to ${result.delivered_to} user(s)`);
+          
+          if (result.delivered_to > 0) {
+            showStatus(
+              `✅ Report submitted and ${result.delivered_to} user(s) notified!`,
+              'success'
+            );
+          } else {
+            showStatus(
+              '✅ Report submitted (no active subscribers)',
+              'success'
+            );
+          }
         }
 
       } catch (pushError) {
-        console.error('⚠️ Push notification error (non-critical):', pushError);
+        console.error('⚠️ Broadcast error (non-critical):', pushError);
+        showStatus('✅ Report submitted (notification failed)', 'warning');
       }
-
-      // Success
-      showStatus('✅ Report submitted successfully! Thank you for helping keep San Pablo City safe.', 'success');
 
       // Reset form
       setTimeout(() => {
@@ -235,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     statusMessage.className = 'status-message ' + type;
     statusMessage.style.display = 'block';
 
-    if (type === 'success') {
+    if (type === 'success' || type === 'warning') {
       setTimeout(() => {
         statusMessage.style.display = 'none';
       }, 5000);
