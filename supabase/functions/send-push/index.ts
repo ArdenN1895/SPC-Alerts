@@ -1,5 +1,6 @@
 // supabase/functions/send-push/index.ts
-// FIXED VERSION: Enhanced mobile compatibility
+// UNIFIED VERSION: Handles both targeted (user_ids) and broadcast (all users) notifications
+// Uses web-push library for proper VAPID signing (mobile-compatible)
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -10,29 +11,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
-
-function log(message: string, data?: any) {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${message}`);
-  if (data) console.log(JSON.stringify(data, null, 2));
-}
-
-// ✅ Helper to construct absolute URLs
-function makeAbsoluteUrl(url: string | undefined, origin: string): string | undefined {
-  if (!url) return undefined;
-  
-  // Already absolute
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-  
-  // Make absolute
-  if (url.startsWith('/')) {
-    return `${origin}${url}`;
-  }
-  
-  return `${origin}/${url}`;
-}
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -47,7 +25,7 @@ serve(async (req) => {
     );
   }
 
-  log("📬 ===== PUSH NOTIFICATION REQUEST =====");
+  console.log("📬 ===== PUSH NOTIFICATION REQUEST =====");
 
   try {
     // Get environment variables
@@ -56,307 +34,179 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    log("🔍 Environment Check:", {
-      vapidPublic: vapidPublic ? `${vapidPublic.substring(0, 20)}...` : "MISSING",
-      vapidPrivate: vapidPrivate ? "SET" : "MISSING",
-      supabaseUrl: supabaseUrl || "MISSING",
-      supabaseKey: supabaseKey ? "SET" : "MISSING"
-    });
+    console.log("🔑 Environment check:");
+    console.log("- VAPID_PUBLIC_KEY:", vapidPublic ? "✅ Set" : "❌ Missing");
+    console.log("- VAPID_PRIVATE_KEY:", vapidPrivate ? "✅ Set" : "❌ Missing");
 
     if (!vapidPublic || !vapidPrivate) {
-      const error = "VAPID keys not configured in environment";
-      log("❌ " + error);
       return new Response(
-        JSON.stringify({ 
-          error,
-          hint: "Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in Supabase Edge Function secrets"
-        }), 
+        JSON.stringify({ error: "VAPID keys not configured" }), 
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (!supabaseUrl || !supabaseKey) {
-      const error = "Supabase configuration missing";
-      log("❌ " + error);
-      return new Response(
-        JSON.stringify({ error }), 
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Configure web-push
+    // Configure web-push with VAPID keys
     webpush.setVapidDetails(
       "mailto:admin@spcalerts.com",
       vapidPublic,
       vapidPrivate
     );
-    log("✅ Web-push configured with VAPID keys");
 
     // Parse request body
-    let requestData;
-    try {
-      requestData = await req.json();
-      log("📦 Request body:", requestData);
-    } catch (parseError) {
-      log("❌ Failed to parse request body:", parseError);
-      return new Response(
-        JSON.stringify({ error: "Invalid JSON in request body" }), 
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    const requestData = await req.json();
     const { 
       title, 
       body, 
-      icon,
-      badge,
+      icon = "/public/img/icon-192.png",
+      badge = "/public/img/badge-72.png",
       image, 
-      url,
+      url = "/public/html/index.html",
       data,
       urgency = "normal",
-      user_ids
+      user_ids // Optional: if provided = targeted, if not = broadcast to ALL
     } = requestData;
+
+    console.log(`📨 Notification: "${title}" - "${body}"`);
+    
+    // Determine notification type
+    if (user_ids && Array.isArray(user_ids) && user_ids.length > 0) {
+      console.log(`🎯 TARGETED notification to ${user_ids.length} specific user(s):`, user_ids);
+    } else {
+      console.log(`📢 BROADCAST notification to ALL subscribed users`);
+    }
 
     // Validate required fields
     if (!title || !body) {
-      log("❌ Missing required fields");
       return new Response(
         JSON.stringify({ error: "title and body are required" }), 
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    log(`📨 Notification: "${title}" - "${body}"`);
-    
-    // Determine notification type
-    const isTargeted = user_ids && Array.isArray(user_ids) && user_ids.length > 0;
-    if (isTargeted) {
-      log(`🎯 TARGETED to ${user_ids.length} user(s):`, user_ids);
-    } else {
-      log("📢 BROADCAST to ALL users");
-    }
-
     // Create Supabase client
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    log("✅ Supabase client created");
+    const supabase = createClient(supabaseUrl!, supabaseKey!);
     
-    // Fetch subscriptions
-    log("🔍 Fetching subscriptions...");
-    let query = supabase
-      .from("push_subscriptions")
-      .select("id, user_id, subscription");
+    // Fetch subscriptions based on whether user_ids is provided
+    let query = supabase.from("push_subscriptions").select("id, user_id, subscription");
     
-    if (isTargeted) {
+    if (user_ids && Array.isArray(user_ids) && user_ids.length > 0) {
+      // TARGETED: Only fetch subscriptions for specified users
       query = query.in('user_id', user_ids);
     }
+    // If no user_ids, fetch ALL subscriptions (broadcast)
 
     const { data: subscriptions, error: fetchError } = await query;
 
     if (fetchError) {
-      log("❌ Database fetch error:", fetchError);
+      console.error("❌ Database error:", fetchError);
       return new Response(
-        JSON.stringify({ 
-          error: `Database error: ${fetchError.message}`,
-          details: fetchError
-        }), 
+        JSON.stringify({ error: `Database error: ${fetchError.message}` }), 
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    log(`📊 Found ${subscriptions?.length || 0} subscription(s)`);
+    console.log(`📊 Found ${subscriptions?.length || 0} subscription(s)`);
 
     if (!subscriptions || subscriptions.length === 0) {
-      const message = isTargeted
-        ? `No subscribers found for users: ${user_ids?.join(', ')}`
-        : "No subscribers in the system";
+      const message = user_ids 
+        ? `No subscribers found for specified users: ${user_ids.join(', ')}`
+        : "No subscribers found in the system";
       
-      log("⚠️ " + message);
+      console.log("⚠️", message);
       
       return new Response(
         JSON.stringify({ 
-          success: true, 
+          success: true, // Don't fail if no subscribers
           delivered_to: 0, 
-          failed: 0,
           message,
-          notification_type: isTargeted ? 'targeted' : 'broadcast',
-          targeted_users: user_ids || null,
-          hint: "Users need to enable notifications in the app"
+          notification_type: user_ids ? 'targeted' : 'broadcast',
+          targeted_users: user_ids || null
         }), 
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ✅ FIX: Get origin from request or use production URL
-    const requestOrigin = req.headers.get('origin') || req.headers.get('referer');
-    let origin = 'https://spc-alerts.vercel.app'; // Default production URL
-    
-    if (requestOrigin) {
-      try {
-        const originUrl = new URL(requestOrigin);
-        origin = originUrl.origin;
-        log("🌐 Using origin from request:", origin);
-      } catch (e) {
-        log("⚠️ Failed to parse origin, using default:", origin);
-      }
-    }
-    
-    // ✅ FIX: Prepare notification payload with proper absolute URLs
+    // Prepare notification payload
     const notificationPayload = JSON.stringify({ 
       title, 
       body, 
-      icon: makeAbsoluteUrl(icon, origin) || `${origin}/public/img/icon-192.png`,
-      badge: makeAbsoluteUrl(badge, origin) || `${origin}/public/img/badge-72.png`,
-      image: makeAbsoluteUrl(image, origin),
-      url: makeAbsoluteUrl(url, origin) || `${origin}/public/html/index.html`,
-      data: {
-        ...(data || {}),
-        timestamp: Date.now(),
-        notificationType: isTargeted ? 'targeted' : 'broadcast'
-      },
-      tag: `spc-alert-${Date.now()}`,
-      // ✅ CRITICAL: Mobile-friendly options
-      requireInteraction: false, // Changed from urgency === 'high'
-      vibrate: [200, 100, 200],
-      silent: false,
-      renotify: true
+      icon: icon || "/public/img/icon-192.png",
+      badge: badge || "/public/img/badge-72.png",
+      image, 
+      url,
+      data: data || {},
+      timestamp: Date.now(),
+      tag: `spc-alert-${Date.now()}`, // Unique tag for each notification
+      requireInteraction: urgency === 'high'
     });
-
-    log("📤 Notification payload prepared");
-    log("📋 Payload preview:", {
-      title,
-      body,
-      icon: JSON.parse(notificationPayload).icon,
-      badge: JSON.parse(notificationPayload).badge,
-      dataSize: notificationPayload.length
-    });
-
-    // ✅ Check payload size (mobile limit is ~4KB)
-    const payloadSizeKB = (notificationPayload.length / 1024).toFixed(2);
-    log(`📏 Payload size: ${payloadSizeKB} KB`);
-    
-    if (notificationPayload.length > 4000) {
-      log("⚠️ WARNING: Payload exceeds 4KB, may fail on some mobile devices");
-    }
 
     let delivered = 0;
     let failed = 0;
-    const errors: Array<{id: string, user_id: string, error: string, statusCode?: number}> = [];
+    const errors: Array<{id: string, user_id: string, error: string}> = [];
 
-    // Send notifications
-    log(`🚀 Sending to ${subscriptions.length} subscription(s)...`);
-    
-    const sendPromises = subscriptions.map(({ id, user_id, subscription }) => (async () => {
+    // Send notifications to all subscriptions
+    for (const { id, user_id, subscription } of subscriptions) {
       try {
+        console.log(`\n📤 Sending to user ${user_id} (subscription ${id})...`);
+        
         // Parse subscription if it's a string
-        const sub = typeof subscription === 'string' 
-          ? JSON.parse(subscription) 
-          : subscription;
+        const sub = typeof subscription === 'string' ? JSON.parse(subscription) : subscription;
+        console.log(`- Endpoint: ${sub.endpoint.substring(0, 50)}...`);
         
-        // ✅ Validate subscription structure
-        if (!sub.endpoint) {
-          throw new Error("Missing endpoint in subscription");
-        }
-        if (!sub.keys?.p256dh || !sub.keys?.auth) {
-          throw new Error("Missing encryption keys in subscription");
-        }
-        
-        log(`📤 Sending to user ${user_id} (subscription ${id})`);
-        log(`🔗 Endpoint: ${sub.endpoint.substring(0, 50)}...`);
-        
-        // ✅ FIX: Proper options for mobile
-        const sendOptions = {
-          TTL: 86400, // 24 hours
-          urgency: urgency as "very-low" | "low" | "normal" | "high",
-          contentEncoding: "aes128gcm" as const,
-          // ✅ Add headers for better mobile delivery
-          headers: {}
-        };
-        
-        // Send the notification
+        // ✅ Use web-push library to send (handles VAPID signing automatically)
         const result = await webpush.sendNotification(
           sub,
           notificationPayload,
-          sendOptions
+          {
+            TTL: 86400, // 24 hours
+            urgency: urgency, // "very-low", "low", "normal", or "high"
+            contentEncoding: "aes128gcm"
+          }
         );
-        
+
+        console.log(`✅ Delivered successfully to user ${user_id} (status: ${result.statusCode})`);
         delivered++;
-        log(`✅ Delivered to user ${user_id} - Status: ${result.statusCode}`);
 
       } catch (error: any) {
+        console.error(`❌ Failed for user ${user_id}:`, error.message);
         failed++;
-        const statusCode = error.statusCode || error.status;
-        const errorMessage = error.message || String(error);
-        
-        log(`❌ Failed for user ${user_id}:`, {
-          message: errorMessage,
-          statusCode,
-          body: error.body
-        });
-        
-        errors.push({ 
-          id, 
-          user_id, 
-          error: errorMessage,
-          statusCode
-        });
+        errors.push({ id, user_id, error: error.message });
 
-        // ✅ Clean up invalid/expired subscriptions
-        if (statusCode === 410 || statusCode === 404 || statusCode === 403) {
-          log(`🗑️ Removing invalid subscription ${id} for user ${user_id}`);
-          try {
-            await supabase.from("push_subscriptions").delete().eq("id", id);
-            log(`✅ Subscription ${id} deleted`);
-          } catch (deleteError) {
-            log(`⚠️ Failed to delete subscription ${id}:`, deleteError);
-          }
+        // Remove invalid/expired subscriptions
+        if (error.statusCode === 410 || error.statusCode === 404) {
+          console.log(`🗑️ Removing invalid subscription ${id} for user ${user_id}`);
+          await supabase.from("push_subscriptions").delete().eq("id", id);
         }
       }
-    })());
-
-    // Wait for all to complete
-    await Promise.allSettled(sendPromises);
+    }
 
     // Log final results
-    log("📊 FINAL RESULTS:", {
-      notificationType: isTargeted ? 'TARGETED' : 'BROADCAST',
-      delivered,
-      failed,
-      totalSubscriptions: subscriptions.length,
-      successRate: `${((delivered / subscriptions.length) * 100).toFixed(1)}%`,
-      payloadSize: `${payloadSizeKB} KB`
-    });
-
-    if (errors.length > 0) {
-      log("⚠️ Errors encountered:", errors);
-    }
+    console.log(`\n📊 FINAL RESULTS:`);
+    console.log(`- Notification type: ${user_ids ? 'TARGETED' : 'BROADCAST'}`);
+    console.log(`- Delivered: ${delivered}`);
+    console.log(`- Failed: ${failed}`);
+    console.log(`- Total subscriptions: ${subscriptions.length}`);
 
     return new Response(
       JSON.stringify({ 
-        success: delivered > 0,
+        success: true,
         delivered_to: delivered,
-        failed,
+        failed: failed,
         total_subscriptions: subscriptions.length,
-        notification_type: isTargeted ? 'targeted' : 'broadcast',
+        notification_type: user_ids ? 'targeted' : 'broadcast',
         targeted_users: user_ids || null,
-        errors: errors.length > 0 ? errors : undefined,
-        payload_size_kb: parseFloat(payloadSizeKB),
-        timestamp: new Date().toISOString()
+        errors: errors.length > 0 ? errors : undefined
       }), 
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error: any) {
-    log("❌ FATAL ERROR:", {
-      message: error.message,
-      type: error.name,
-      stack: error.stack
-    });
-    
+    console.error("❌ FATAL ERROR:", error);
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Unknown error",
+        error: error.message,
         type: error.name,
-        timestamp: new Date().toISOString()
+        stack: error.stack
       }), 
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
